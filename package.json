@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "camsnap:start": "go run ./cmd/camsnap",
-    "camsnap:build": "go build ./cmd/camsnap",
-    "camsnap:test": "go test ./...",
-    "camsnap:lint": "golangci-lint run ./...",
-    "camsnap:format": "make fmt",
-    "camsnap:check": "make lint test"
+    "camsnap": "go run ./cmd/camsnap",
+    "build": "go build ./cmd/camsnap",
+    "test": "go test ./...",
+    "lint": "golangci-lint run ./...",
+    "format": "make fmt",
+    "check": "make lint test"
   }
 }
