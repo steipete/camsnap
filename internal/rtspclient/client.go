@@ -1,3 +1,4 @@
+// Package rtspclient provides RTSP helpers using gortsplib.
 package rtspclient
 
 import (
@@ -86,6 +87,7 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		if err != nil {
 			if err != rtph264.ErrMorePacketsNeeded {
 				// ignore non-fatal decode errors
+				return
 			}
 			return
 		}
@@ -119,8 +121,6 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 	case <-done:
 	case err := <-errCh:
 		return fmt.Errorf("rtsp client: %w", err)
-	case <-ctxTimeout.Done():
-		return fmt.Errorf("timeout waiting for frame")
 	case <-ctxTimeout.Done():
 		return fmt.Errorf("timeout waiting for frame")
 	}

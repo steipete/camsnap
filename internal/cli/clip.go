@@ -32,9 +32,6 @@ func newClipCmd() *cobra.Command {
 			if cameraName == "" {
 				return fmt.Errorf("--camera is required")
 			}
-			if outPath == "" {
-				return fmt.Errorf("--out is required")
-			}
 			if duration <= 0 {
 				return fmt.Errorf("--dur must be > 0")
 			}
@@ -46,7 +43,9 @@ func newClipCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("create temp file: %w", err)
 				}
-				tmp.Close()
+				if err := tmp.Close(); err != nil {
+					return fmt.Errorf("close temp file: %w", err)
+				}
 				outPath = tmp.Name()
 				cmd.Printf("No --out provided, writing clip to %s\n", outPath)
 			}
