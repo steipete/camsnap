@@ -19,6 +19,9 @@ func NewRootCommand(version string) *cobra.Command {
 		Example:       exampleText(),
 	}
 
+	cmd.Version = version
+	cmd.SetVersionTemplate("{{.Version}}\n")
+
 	cmd.PersistentFlags().String("config", "", "Path to config file (default: $XDG_CONFIG_HOME/camsnap/config.yaml)")
 
 	cmd.AddCommand(
