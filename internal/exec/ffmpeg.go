@@ -1,3 +1,4 @@
+// Package exec wraps external command execution helpers.
 package exec
 
 import (

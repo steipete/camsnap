@@ -1,3 +1,4 @@
+// Package rtsp builds RTSP URLs for cameras.
 package rtsp
 
 import (

@@ -16,7 +16,7 @@ func newDiscoverCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Discover cameras on the local network via ONVIF WS-Discovery",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			sty := newStyler(cmd.OutOrStdout())
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()

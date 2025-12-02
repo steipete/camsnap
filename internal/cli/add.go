@@ -1,3 +1,4 @@
+// Package cli wires cobra commands for camsnap.
 package cli
 
 import (
@@ -12,11 +13,11 @@ func newAddCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "add",
-	Short: "Add or update a camera",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if cam.Name == "" || cam.Host == "" || cam.Username == "" {
-			return fmt.Errorf("name, host, and username are required")
-		}
+		Short: "Add or update a camera",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cam.Name == "" || cam.Host == "" || cam.Username == "" {
+				return fmt.Errorf("name, host, and username are required")
+			}
 			if cam.Port == 0 {
 				cam.Port = 554
 			}

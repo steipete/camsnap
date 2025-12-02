@@ -87,7 +87,9 @@ func doInfoRequest(ctx context.Context, client *http.Client, url, body, authHead
 	if err != nil {
 		return DeviceInfo{}, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return DeviceInfo{}, fmt.Errorf("auth failed (status %d)", resp.StatusCode)

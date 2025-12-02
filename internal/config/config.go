@@ -1,3 +1,4 @@
+// Package config handles persistence of camsnap configuration.
 package config
 
 import (

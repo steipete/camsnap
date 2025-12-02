@@ -1,3 +1,4 @@
+// Package discovery handles ONVIF WS-Discovery probing.
 package discovery
 
 import (
@@ -61,7 +62,9 @@ func Discover(ctx context.Context, timeout time.Duration) ([]Device, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listen udp: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	msgID := fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		rand.Uint32(),
@@ -129,9 +132,7 @@ func parseProbeMatch(data []byte) ([]string, error) {
 	}
 	var addrs []string
 	for _, m := range env.Body.Matches {
-		for _, addr := range strings.Fields(m.XAddrs) {
-			addrs = append(addrs, addr)
-		}
+		addrs = append(addrs, strings.Fields(m.XAddrs)...)
 	}
 	if len(addrs) == 0 {
 		return nil, fmt.Errorf("no addresses")

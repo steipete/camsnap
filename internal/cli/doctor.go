@@ -19,7 +19,7 @@ func newDoctorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Run basic checks (ffmpeg in PATH, config present, camera ports reachable)",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			sty := newStyler(cmd.OutOrStdout())
 
 			cfgFlag, err := configPathFlag(cmd)
@@ -89,7 +89,7 @@ func dialOnce(addr string, timeout time.Duration) error {
 	return conn.Close()
 }
 
-func probeRTSP(cmd *cobra.Command, url string, timeout time.Duration, authMode, transport string) error {
+func probeRTSP(_ *cobra.Command, url string, timeout time.Duration, authMode, transport string) error {
 	// retry a couple times to avoid transient RTSP setup errors
 	var lastErr error
 	var lastOut string

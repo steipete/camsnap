@@ -1,3 +1,4 @@
+// camsnap CLI entrypoint.
 package main
 
 import (

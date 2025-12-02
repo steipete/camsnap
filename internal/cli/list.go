@@ -11,7 +11,7 @@ func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List saved cameras",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			sty := newStyler(cmd.OutOrStdout())
 			cfgFlag, err := configPathFlag(cmd)
 			if err != nil {

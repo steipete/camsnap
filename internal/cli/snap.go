@@ -37,7 +37,9 @@ func newSnapCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("create temp file: %w", err)
 				}
-				tmp.Close()
+				if err := tmp.Close(); err != nil {
+					return fmt.Errorf("close temp file: %w", err)
+				}
 				outPath = tmp.Name()
 				cmd.Printf("No --out provided, writing snapshot to %s\n", outPath)
 			}
