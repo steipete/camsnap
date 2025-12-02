@@ -21,6 +21,7 @@ cmd/**/dist/
 
 # Local tools/cache
 .bin/
+node_modules/
 
 # Media artifacts
 *.jpg
