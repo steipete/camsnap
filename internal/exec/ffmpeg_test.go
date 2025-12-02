@@ -1,6 +1,9 @@
 package exec
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestClassifyError(t *testing.T) {
 	cases := []struct {
@@ -18,5 +21,15 @@ func TestClassifyError(t *testing.T) {
 		if got := ClassifyError(c.err); got != c.want {
 			t.Fatalf("ClassifyError(%q) got %s want %s", c.err, got, c.want)
 		}
+	}
+}
+
+func TestWithTimeoutZero(t *testing.T) {
+	ctx, cancel := WithTimeout(context.Background(), 0)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+		t.Fatalf("zero timeout context should not be canceled immediately")
+	default:
 	}
 }

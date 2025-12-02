@@ -25,6 +25,17 @@ func TestBuildURL(t *testing.T) {
 	}
 }
 
+func TestBuildURLInvalidProtocol(t *testing.T) {
+	cam := config.Camera{
+		Name:     "cam3",
+		Host:     "10.0.0.3",
+		Protocol: "http",
+	}
+	if _, err := BuildURL(cam); err == nil {
+		t.Fatalf("expected error for invalid protocol")
+	}
+}
+
 func TestBuildURLDefaults(t *testing.T) {
 	cam := config.Camera{
 		Name: "cam2",

@@ -45,6 +45,17 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigPathXDG(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/tmp/xdgtest")
+	path, err := DefaultConfigPath()
+	if err != nil {
+		t.Fatalf("DefaultConfigPath: %v", err)
+	}
+	if path != "/tmp/xdgtest/camsnap/config.yaml" {
+		t.Fatalf("unexpected path: %s", path)
+	}
+}
+
 func TestLoadMissingOK(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "missing.yaml")

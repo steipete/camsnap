@@ -26,3 +26,24 @@ func TestParseProbeMatch(t *testing.T) {
 		t.Fatalf("expected 2 addrs, got %d", len(addrs))
 	}
 }
+
+func TestUniqueDevices(t *testing.T) {
+	devs := []Device{
+		{Address: "http://a", Host: "a"},
+		{Address: "http://b", Host: "b"},
+		{Address: "http://a", Host: "a"},
+	}
+	out := uniqueDevices(devs)
+	if len(out) != 2 {
+		t.Fatalf("expected 2 unique devices, got %d", len(out))
+	}
+}
+
+func TestHostPort(t *testing.T) {
+	if hp := hostPort("http://10.0.0.1:2020/onvif"); hp != "10.0.0.1:2020" {
+		t.Fatalf("unexpected hostPort %s", hp)
+	}
+	if hp := hostPort("nonsense"); hp != "" {
+		t.Fatalf("expected empty for bad url, got %s", hp)
+	}
+}
