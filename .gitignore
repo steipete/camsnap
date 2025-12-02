@@ -1,0 +1,29 @@
+# Go
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+
+# Build artifacts
+cmd/**/dist/
+
+# macOS
+.DS_Store
+
+# Editor/IDE
+.idea/
+.vscode/
+
+# Local tools/cache
+.bin/
+
+# Media artifacts
+*.jpg
+*.jpeg
+*.png
+*.mp4
