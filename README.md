@@ -1,5 +1,4 @@
-# 📸 camsnap
-One command to grab frames, clips, or motion alerts from your cams (RTSP/ONVIF; Tapo first, Ubiquiti next).
+# 📸 camsnap — One command to grab frames, clips, or motion alerts from your cams (RTSP/ONVIF).
 
 ## Install / Run
 - Requirements: Go 1.25+ and `ffmpeg` on PATH.
