@@ -7,3 +7,4 @@
 - RTSP helper and config persistence with tests.
 - gortsplib fallback client and Tapo-friendly UDP/stream controls.
 - Colorized TTY output; lint/test Makefile; updated dependencies.
+- Config now uses XDG path `~/.config/camsnap/config.yaml`.

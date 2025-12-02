@@ -31,11 +31,15 @@ type Config struct {
 
 // DefaultConfigPath returns the OS-specific config file path.
 func DefaultConfigPath() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("user config dir: %w", err)
+	xdg := os.Getenv("XDG_CONFIG_HOME")
+	if xdg == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("home dir: %w", err)
+		}
+		xdg = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "camsnap", "config.yaml"), nil
+	return filepath.Join(xdg, "camsnap", "config.yaml"), nil
 }
 
 // Load reads a config file; returns empty config if the file is absent.

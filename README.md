@@ -9,7 +9,7 @@ CLI to capture snapshots, short clips, and run motion detection against RTSP/ONV
 - If `--out` is omitted, snap/clip writes to a temp file and prints the path.
 
 ## Config
-- Stored at `/Users/steipete/Library/Application Support/camsnap/config.yaml` on macOS (XDG fallback can be added later).
+- Stored at `~/.config/camsnap/config.yaml` (XDG).
 - Per-camera defaults supported: `rtsp_transport`, `stream`, `rtsp_client`, `no_audio`, `audio_codec`.
 
 ### Add a camera
