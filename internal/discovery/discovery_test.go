@@ -1,6 +1,11 @@
 package discovery
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+)
 
 const sampleProbeMatch = `<?xml version="1.0" encoding="UTF-8"?>
 <e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope"
@@ -45,5 +50,22 @@ func TestHostPort(t *testing.T) {
 	}
 	if hp := hostPort("nonsense"); hp != "" {
 		t.Fatalf("expected empty for bad url, got %s", hp)
+	}
+}
+
+func TestDiscoverTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	_, err := Discover(ctx, 10*time.Millisecond)
+	// Should return either nil or timeout error; we only care that it doesn't hang.
+	if err != nil && !strings.Contains(err.Error(), "timeout") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseProbeMatchError(t *testing.T) {
+	_, err := parseProbeMatch([]byte("garbage"))
+	if err == nil {
+		t.Fatalf("expected error for bad xml")
 	}
 }

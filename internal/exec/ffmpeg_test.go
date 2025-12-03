@@ -33,3 +33,12 @@ func TestWithTimeoutZero(t *testing.T) {
 	default:
 	}
 }
+
+func TestHasBinary(t *testing.T) {
+	if !HasBinary("go") {
+		t.Fatalf("expected 'go' to be found in PATH")
+	}
+	if HasBinary("definitely_missing_binary_xyz") {
+		t.Fatalf("expected missing binary to return false")
+	}
+}
