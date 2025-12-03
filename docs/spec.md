@@ -1,10 +1,10 @@
-## camsnap – CLI for RTSP cameras (Tapo first, Ubiquiti next)
+## camsnap – CLI for RTSP/ONVIF cameras
 
 ### Goals (MVP)
 - Add/list cameras with stored per‑camera credentials (Tapo “Camera Account” or equivalent local user).
 - Grab a still frame (`snap`) or short clip (`clip`) from an RTSP URL.
 - Skeleton for motion watch daemon (`watch`) that will later trigger a command on motion.
-- Discovery placeholder (`discover`) to be backed by ONVIF scanning in a follow‑up.
+- ONVIF WS-Discovery to find cameras and print ready-to-use `add` commands.
 
 ### Out of scope for MVP
 - Tapo cloud login (no public API; only per‑camera accounts via RTSP/ONVIF).
@@ -17,9 +17,9 @@
 - `camsnap list`
   - Shows saved cameras and derived RTSP URLs (without passwords in output).
 - `camsnap snap --camera cam1 --out cam1.jpg [--timeout 5s]`
-  - Uses `ffmpeg` to grab a single frame via RTSP.
-- `camsnap clip --camera cam1 --dur 10s --out cam1.mp4 [--timeout 20s]`
-  - Uses `ffmpeg` to pull a short segment (copy or transcode later).
+  - Uses `ffmpeg` to grab a single frame via RTSP. If `--out` is omitted, writes to a temp file and prints the path.
+- `camsnap clip --camera cam1 --dur 10s [--out cam1.mp4] [--timeout 20s]`
+  - Uses `ffmpeg` to pull a short segment (copy or transcode later). If `--out` is omitted, writes to a temp file and prints the path.
 - `camsnap discover`
   - ONVIF WS-Discovery multicast probe; prints host:port and an example `add` command. `--info` optionally calls GetDeviceInformation (WS-Security UsernameToken, fallback to basic) to show model/fw.
 - `camsnap doctor`
