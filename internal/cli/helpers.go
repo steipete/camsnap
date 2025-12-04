@@ -53,6 +53,22 @@ func appendStream(baseURL, stream string) string {
 	return baseURL + stream
 }
 
+// appendPath replaces the trailing path of an RTSP URL with a custom path.
+func appendPath(baseURL, path string) string {
+	if path == "" {
+		return baseURL
+	}
+	if path[0] != '/' {
+		path = "/" + path
+	}
+	for i := len(baseURL) - 1; i >= 0; i-- {
+		if baseURL[i] == '/' {
+			return baseURL[:i] + path
+		}
+	}
+	return baseURL + path
+}
+
 // loadConfigFromFlag reads the persistent config flag off a command and loads the config.
 func loadConfigFromFlag(cmd *cobra.Command) (config.Config, string, error) {
 	cfgFlag, err := configPathFlag(cmd)

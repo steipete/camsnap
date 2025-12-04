@@ -21,6 +21,7 @@ func newClipCmd() *cobra.Command {
 	var stream string
 	var noAudio bool
 	var audioCodec string
+	var path string
 
 	cmd := &cobra.Command{
 		Use:   "clip",
@@ -63,11 +64,23 @@ func newClipCmd() *cobra.Command {
 				return fmt.Errorf("camera %q not found", cameraName)
 			}
 
+			if stream != "" && path != "" {
+				return fmt.Errorf("use --path for custom RTSP token URLs; omit --stream")
+			}
+
+			if path == "" && cam.Path != "" {
+				path = cam.Path
+			}
+			if path != "" {
+				cam.Path = path
+				cam.Stream = ""
+			}
+
 			// per-camera defaults
 			if transport == "" && cam.RTSPTransport != "" {
 				transport = cam.RTSPTransport
 			}
-			if stream == "" && cam.Stream != "" {
+			if stream == "" && cam.Stream != "" && path == "" {
 				stream = cam.Stream
 			}
 			if !noAudio && cam.NoAudio {
@@ -92,7 +105,11 @@ func newClipCmd() *cobra.Command {
 			ctx, cancel := exec.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
-			url = appendStream(url, stream)
+			if path != "" {
+				url = appendPath(url, path)
+			} else {
+				url = appendStream(url, stream)
+			}
 
 			ffArgs := []string{
 				"-y",
@@ -123,7 +140,8 @@ func newClipCmd() *cobra.Command {
 	cmd.Flags().DurationVar(&timeout, "timeout", 20*time.Second, "Timeout for ffmpeg invocation")
 	cmd.Flags().StringVar(&authMode, "rtsp-auth", "auto", "RTSP auth mode: auto|basic|digest")
 	cmd.Flags().StringVar(&transport, "rtsp-transport", "tcp", "RTSP transport: tcp|udp")
-	cmd.Flags().StringVar(&stream, "stream", "stream1", "RTSP path (stream1 or stream2)")
+	cmd.Flags().StringVar(&stream, "stream", "", "RTSP path segment (stream1 or stream2); ignored if --path is set")
+	cmd.Flags().StringVar(&path, "path", "", "Custom RTSP path (overrides --stream), e.g., /Bfy... from UniFi Protect")
 	cmd.Flags().BoolVar(&noAudio, "no-audio", false, "Drop audio track")
 	cmd.Flags().StringVar(&audioCodec, "audio-codec", "", "Audio codec (default aac); ignored if --no-audio")
 

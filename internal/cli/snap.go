@@ -20,6 +20,7 @@ func newSnapCmd() *cobra.Command {
 	var transport string
 	var stream string
 	var client string
+	var path string
 
 	cmd := &cobra.Command{
 		Use:   "snap",
@@ -47,6 +48,10 @@ func newSnapCmd() *cobra.Command {
 				return fmt.Errorf("ffmpeg not found in PATH")
 			}
 
+			if stream != "" && path != "" {
+				return fmt.Errorf("use --path for custom RTSP token URLs; omit --stream")
+			}
+
 			cfgFlag, err := configPathFlag(cmd)
 			if err != nil {
 				return err
@@ -59,6 +64,15 @@ func newSnapCmd() *cobra.Command {
 			if !ok {
 				return fmt.Errorf("camera %q not found", cameraName)
 			}
+
+			if path == "" && cam.Path != "" {
+				path = cam.Path
+			}
+			if path != "" {
+				cam.Path = path
+				cam.Stream = ""
+			}
+
 			url, err := rtsp.BuildURL(cam)
 			if err != nil {
 				return err
@@ -68,7 +82,7 @@ func newSnapCmd() *cobra.Command {
 			if transport == "" && cam.RTSPTransport != "" {
 				transport = cam.RTSPTransport
 			}
-			if stream == "" && cam.Stream != "" {
+			if stream == "" && cam.Stream != "" && path == "" {
 				stream = cam.Stream
 			}
 			if client == "" && cam.RTSPClient != "" {
@@ -86,7 +100,11 @@ func newSnapCmd() *cobra.Command {
 			ctx, cancel := exec.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
-			url = appendStream(url, stream)
+			if path != "" {
+				url = appendPath(url, path)
+			} else {
+				url = appendStream(url, stream)
+			}
 
 			if client == "gortsplib" {
 				return rtspclient.GrabFrameViaGort(ctx, url, xport, outPath, timeout)
@@ -109,7 +127,8 @@ func newSnapCmd() *cobra.Command {
 	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Second, "Timeout for ffmpeg invocation")
 	cmd.Flags().StringVar(&authMode, "rtsp-auth", "auto", "RTSP auth mode: auto|basic|digest")
 	cmd.Flags().StringVar(&transport, "rtsp-transport", "tcp", "RTSP transport: tcp|udp")
-	cmd.Flags().StringVar(&stream, "stream", "stream1", "RTSP path (stream1 or stream2)")
+	cmd.Flags().StringVar(&stream, "stream", "", "RTSP path segment (stream1 or stream2); ignored if --path is set")
+	cmd.Flags().StringVar(&path, "path", "", "Custom RTSP path (overrides --stream), e.g., /Bfy... from UniFi Protect")
 	cmd.Flags().StringVar(&client, "rtsp-client", "ffmpeg", "RTSP client: ffmpeg|gortsplib")
 
 	return cmd

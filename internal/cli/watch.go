@@ -25,6 +25,7 @@ func newWatchCmd() *cobra.Command {
 	var authMode string
 	var transport string
 	var stream string
+	var path string
 
 	cmd := &cobra.Command{
 		Use:   "watch",
@@ -65,6 +66,16 @@ func newWatchCmd() *cobra.Command {
 			if !ok {
 				return fmt.Errorf("camera %q not found", cameraName)
 			}
+			if stream != "" && path != "" {
+				return fmt.Errorf("use --path for custom RTSP token URLs; omit --stream")
+			}
+			if path == "" && cam.Path != "" {
+				path = cam.Path
+			}
+			if path != "" {
+				cam.Path = path
+				cam.Stream = ""
+			}
 			url, err := rtsp.BuildURL(cam)
 			if err != nil {
 				return err
@@ -84,7 +95,7 @@ func newWatchCmd() *cobra.Command {
 				defer cancel()
 			}
 
-			return watchMotion(ctx, cameraName, url, threshold, cooldown, action, tmpl, jsonOutput, xport, stream, cmd)
+			return watchMotion(ctx, cameraName, url, threshold, cooldown, action, tmpl, jsonOutput, xport, stream, path, cmd)
 		},
 	}
 
@@ -97,18 +108,23 @@ func newWatchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&tmpl, "action-template", "", "Optional template to build action command (placeholders: {camera},{score},{time})")
 	cmd.Flags().StringVar(&authMode, "rtsp-auth", "auto", "RTSP auth mode: auto|basic|digest")
 	cmd.Flags().StringVar(&transport, "rtsp-transport", "tcp", "RTSP transport: tcp|udp")
-	cmd.Flags().StringVar(&stream, "stream", "stream1", "RTSP path (stream1 or stream2)")
+	cmd.Flags().StringVar(&stream, "stream", "", "RTSP path segment (stream1 or stream2); ignored if --path is set")
+	cmd.Flags().StringVar(&path, "path", "", "Custom RTSP path (overrides --stream), e.g., /Bfy... from UniFi Protect")
 
 	return cmd
 }
 
-func watchMotion(ctx context.Context, cameraName, url string, threshold float64, cooldown time.Duration, action string, tmpl string, jsonOutput bool, transport string, stream string, cmd *cobra.Command) error {
+func watchMotion(ctx context.Context, cameraName, url string, threshold float64, cooldown time.Duration, action string, tmpl string, jsonOutput bool, transport string, stream string, path string, cmd *cobra.Command) error {
 	ffArgs := []string{
 		"-hide_banner",
 		"-loglevel", "info",
 		"-rtsp_transport", transport,
 	}
-	url = appendStream(url, stream)
+	if path != "" {
+		url = appendPath(url, path)
+	} else {
+		url = appendStream(url, stream)
+	}
 	ffArgs = append(ffArgs,
 		"-i", url,
 		"-an",

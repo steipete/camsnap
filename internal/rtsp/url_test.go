@@ -50,3 +50,21 @@ func TestBuildURLDefaults(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 }
+
+func TestBuildURLWithPath(t *testing.T) {
+	cam := config.Camera{
+		Name:     "protect",
+		Host:     "192.168.1.1",
+		Port:     7447,
+		Protocol: "rtsp",
+		Path:     "/Bfy47SNWz9n2WRrw",
+	}
+	got, err := BuildURL(cam)
+	if err != nil {
+		t.Fatalf("BuildURL: %v", err)
+	}
+	want := "rtsp://192.168.1.1:7447/Bfy47SNWz9n2WRrw"
+	if got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+}

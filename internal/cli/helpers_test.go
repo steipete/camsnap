@@ -63,3 +63,20 @@ func TestTransportFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendPath(t *testing.T) {
+	base := "rtsp://192.168.1.1:7447/stream1"
+	got := appendPath(base, "/Bfy47")
+	want := "rtsp://192.168.1.1:7447/Bfy47"
+	if got != want {
+		t.Fatalf("appendPath absolute: got %s want %s", got, want)
+	}
+	got = appendPath(base, "Bfy47")
+	if got != want {
+		t.Fatalf("appendPath no slash: got %s want %s", got, want)
+	}
+	got = appendPath(base, "")
+	if got != base {
+		t.Fatalf("appendPath empty: got %s want %s", got, base)
+	}
+}

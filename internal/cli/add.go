@@ -15,8 +15,8 @@ func newAddCmd() *cobra.Command {
 		Use:   "add",
 		Short: "Add or update a camera",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if cam.Name == "" || cam.Host == "" || cam.Username == "" {
-				return fmt.Errorf("name, host, and username are required")
+			if cam.Name == "" || cam.Host == "" {
+				return fmt.Errorf("name and host are required")
 			}
 			if cam.Port == 0 {
 				cam.Port = 554
@@ -52,6 +52,7 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cam.Protocol, "protocol", "rtsp", "Protocol (rtsp or rtsps)")
 	cmd.Flags().StringVar(&cam.Username, "user", "", "Camera username")
 	cmd.Flags().StringVar(&cam.Password, "pass", "", "Camera password")
+	cmd.Flags().StringVar(&cam.Path, "path", "", "Explicit RTSP path (e.g., /Bfy... token from UniFi Protect)")
 	cmd.Flags().StringVar(&cam.RTSPTransport, "rtsp-transport", "", "Preferred RTSP transport for this camera (tcp|udp)")
 	cmd.Flags().StringVar(&cam.Stream, "stream", "", "Default RTSP stream path (stream1 or stream2)")
 	cmd.Flags().StringVar(&cam.RTSPClient, "rtsp-client", "", "Default RTSP client (ffmpeg|gortsplib)")

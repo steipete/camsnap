@@ -50,6 +50,14 @@ func BuildURL(cam config.Camera) (string, error) {
 		authority = userInfo + "@" + host
 	}
 
-	// Default to /stream1 as the main Tapo stream.
-	return fmt.Sprintf("%s://%s/stream1", proto, authority), nil
+	path := cam.Path
+	if path == "" {
+		// Default to /stream1 as the main Tapo stream.
+		path = "/stream1"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	return fmt.Sprintf("%s://%s%s", proto, authority, path), nil
 }
