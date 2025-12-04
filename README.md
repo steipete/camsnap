@@ -1,7 +1,8 @@
 # 📸 camsnap — One command to grab frames, clips, or motion alerts from your cams (RTSP/ONVIF).
 
 ## Install / Run
-- Requirements: Go 1.25+ and `ffmpeg` on PATH.
+- Homebrew (installs `ffmpeg` automatically): `brew install steipete/tap/camsnap`
+- Requirements for source run: Go 1.25+ and `ffmpeg` on PATH.
 - Run in-place: `go run ./cmd/camsnap --help`
 - Camera name may be positional (e.g., `camsnap snap kitchen ...`).
 - If `--out` is omitted, snap/clip writes to a temp file and prints the path.
