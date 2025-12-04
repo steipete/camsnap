@@ -15,7 +15,7 @@ Follow these steps for each release. Title GitHub releases as `camsnap <version>
   - `GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X main.version=<version>" -o /tmp/camsnap-arm64 ./cmd/camsnap`
   - Package: copy binary + README + LICENSE into `/tmp/camsnap-arm64-dist` and `tar -czf /tmp/camsnap-macos-arm64.tar.gz camsnap-arm64-dist`
 - Compute checksums: `shasum -a 256 /tmp/camsnap-<version>.tar.gz /tmp/camsnap-macos-arm64.tar.gz`.
-- Update `homebrew-tap/Formula/camsnap.rb` to point to the new tag + revision and ensure `ffmpeg` dependency.
+- Update `homebrew-tap/Formula/camsnap.rb` to point to the arm64 release artifact URL + sha256, set `version` to match, and keep `ffmpeg` dependency (`depends_on arch: :arm64`).
 - Update tap README with the new version/date if needed.
 - Commit and push changes in camsnap and the tap; push tags: `git push origin main --tags` then `git push` in `../homebrew-tap`.
 - Create GitHub release for `v<version>`:
