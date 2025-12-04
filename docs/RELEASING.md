@@ -22,5 +22,5 @@ Follow these steps for each release. Title GitHub releases as `camsnap <version>
   - Title: `camsnap <version>`
   - Body: bullets from `CHANGELOG.md` for that version
   - Assets: attach `/tmp/camsnap-<version>.tar.gz` and `/tmp/camsnap-macos-arm64.tar.gz` with their SHA256 sums in the body
-- Verify Homebrew install: `brew update && brew reinstall steipete/tap/camsnap && camsnap --version`.
+- Verify Homebrew install (one-line tap+install): `brew update && brew reinstall steipete/tap/camsnap && camsnap --version`.
 - Smoke-test CLI: `camsnap --help`, `camsnap discover --info` (should not crash), and a sample `snap` against a known camera if available.
