@@ -8,12 +8,17 @@
 
 ## Config
 - Stored at `~/.config/camsnap/config.yaml` (XDG).
-- Per-camera defaults supported: `rtsp_transport`, `stream`, `rtsp_client`, `no_audio`, `audio_codec`.
+- Per-camera defaults supported: `rtsp_transport`, `stream`, `rtsp_client`, `no_audio`, `audio_codec`, `path` (for tokenized RTSP such as UniFi Protect).
 
 ### Add a camera
 ```sh
 go run ./cmd/camsnap add --name kitchen --host 192.168.0.175 --user tapo --pass 'secret' \
   --rtsp-transport udp --stream stream2 --rtsp-client gortsplib
+```
+For UniFi Protect (RTSP token), enable RTSP in Protect, copy the stream URL, and add it with the token path:
+```sh
+go run ./cmd/camsnap add --name ssg15-livingroom --host 192.168.1.1 --port 7447 \
+  --protocol rtsp --path Bfy47SNWz9n2WRrw
 ```
 
 ### Snapshot
@@ -21,12 +26,17 @@ go run ./cmd/camsnap add --name kitchen --host 192.168.0.175 --user tapo --pass 
 go run ./cmd/camsnap snap kitchen --out shot.jpg
 # or rely on per-camera defaults; set as needed:
 #   --rtsp-transport tcp|udp  --stream stream1|stream2  --rtsp-client ffmpeg|gortsplib
+# For Protect tokenized streams:
+#   go run ./cmd/camsnap snap ssg15-livingroom --path Bfy47SNWz9n2WRrw --out shot.jpg
+# (Longer timeouts like --timeout 20s may help Protect streams deliver the first keyframe.)
 ```
 
 ### Clip
 ```sh
 go run ./cmd/camsnap clip kitchen --dur 5s --no-audio --out clip.mp4
 # video is copied; audio can be dropped (--no-audio) or transcoded (--audio-codec aac)
+# Protect example:
+#   go run ./cmd/camsnap clip ssg15-livingroom --path Bfy47SNWz9n2WRrw --dur 5s --out clip.mp4
 ```
 
 ### Motion watch
@@ -34,6 +44,8 @@ go run ./cmd/camsnap clip kitchen --dur 5s --no-audio --out clip.mp4
 go run ./cmd/camsnap watch kitchen --threshold 0.2 --cooldown 5s \
   --json --action 'touch /tmp/motion-$(date +%s)'
 # env passed to action: CAMSNAP_CAMERA, CAMSNAP_SCORE, CAMSNAP_TIME
+# Protect example (tokenized path):
+#   go run ./cmd/camsnap watch ssg15-livingroom --path Bfy47SNWz9n2WRrw --threshold 0.2 --action 'touch /tmp/motion'
 ```
 
 ### Discover (ONVIF)
