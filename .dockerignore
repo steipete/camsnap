@@ -1,0 +1,8 @@
+bin/
+cmd/**/dist/
+node_modules/
+.git/
+*.jpg
+*.jpeg
+*.png
+*.mp4

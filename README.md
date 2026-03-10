@@ -4,6 +4,12 @@
 - Homebrew (installs `ffmpeg` automatically): `brew install steipete/tap/camsnap`
 - Requirements for source run: Go 1.22+ and `ffmpeg` on PATH.
 - Run in-place: `go run ./cmd/camsnap --help`
+- Run in Docker: `docker run --rm ghcr.io/steipete/camsnap --help`
+  Mount volumes for persistent config and output:
+  ```sh
+  docker run --rm -v camsnap-config:/config -v "$PWD":/output \
+    ghcr.io/steipete/camsnap snap kitchen --out shot.jpg
+  ```
 - Camera name may be positional (e.g., `camsnap snap kitchen ...`).
 - If `--out` is omitted, snap/clip writes to a temp file and prints the path.
 
