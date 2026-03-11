@@ -7,7 +7,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /camsnap ./cmd/camsnap
 
 FROM alpine:3.23
 RUN apk add --no-cache ffmpeg
-RUN adduser -D -h /home/camsnap camsnap
+RUN adduser -D -h /home/camsnap camsnap \
+ && mkdir -p /config /output \
+ && chown camsnap:camsnap /config /output
 USER camsnap
 ENV XDG_CONFIG_HOME=/config
 VOLUME ["/config", "/output"]
