@@ -119,16 +119,32 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: git checkout ${{ inputs.tag }}
 
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
-            type=raw,value=latest
+      - name: Resolve Docker tags
+        id: docker-tags
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            release_tag="${{ inputs.tag }}"
+          else
+            release_tag="${{ github.ref_name }}"
+          fi
+          version="${release_tag#v}"
+          minor="${version%.*}"
+          major="${version%%.*}"
+
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:${version}"
+            echo "${IMAGE}:${minor}"
+            if [ "$major" != "0" ]; then
+              echo "${IMAGE}:${major}"
+            fi
+            echo "${IMAGE}:latest"
+            echo "EOF"
+            echo "labels<<EOF"
+            echo "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+            echo "org.opencontainers.image.version=${version}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -149,7 +165,7 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.docker-tags.outputs.tags }}
+          labels: ${{ steps.docker-tags.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
