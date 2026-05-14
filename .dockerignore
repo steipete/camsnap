@@ -2,6 +2,8 @@ bin/
 cmd/**/dist/
 node_modules/
 .git/
+.DS_Store
+*.exe
 *.jpg
 *.jpeg
 *.png
