@@ -3,8 +3,8 @@ module github.com/steipete/camsnap
 go 1.25.0
 
 require (
-	github.com/bluenviron/gortsplib/v4 v4.16.2
-	github.com/bluenviron/mediacommon/v2 v2.8.3
+	github.com/bluenviron/gortsplib/v5 v5.6.1
+	github.com/bluenviron/mediacommon/v2 v2.9.1
 	github.com/mattn/go-isatty v0.0.22
 	github.com/muesli/termenv v0.16.0
 	github.com/pion/rtp v1.10.2
@@ -15,6 +15,7 @@ require (
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect

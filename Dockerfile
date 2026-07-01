@@ -5,7 +5,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /camsnap ./cmd/camsnap
 
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk add --no-cache ffmpeg
 RUN adduser -D -h /home/camsnap camsnap \
  && mkdir -p /config /output \
