@@ -63,12 +63,17 @@ func Load(path string) (Config, error) {
 
 // Save writes the config to disk, creating parent directories as needed.
 func Save(path string, cfg Config) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("mkdir config dir: %w", err)
 	}
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
+	}
+	// WriteFile does not tighten permissions on an existing file, so repair the
+	// mode before replacing credentials that may otherwise remain world-readable.
+	if err := os.Chmod(path, 0o600); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("secure config permissions: %w", err)
 	}
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)

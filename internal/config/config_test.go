@@ -121,3 +121,22 @@ func TestSavePermissions(t *testing.T) {
 		t.Fatalf("expected 0600 perms, got %o", perm)
 	}
 }
+
+func TestSaveRepairsPermissions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	if err := os.WriteFile(path, []byte("cameras: []\n"), 0o644); err != nil {
+		t.Fatalf("seed config: %v", err)
+	}
+
+	if err := Save(path, Config{}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("expected repaired 0600 perms, got %o", perm)
+	}
+}
