@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/bluenviron/gortsplib/v5"
@@ -79,10 +80,16 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 	}
 
 	var sample bytes.Buffer
+	var sampleMu sync.Mutex
 	done := make(chan struct{})
 	errCh := make(chan error, 1)
 
 	cl.OnPacketRTP(medi, fmtH264, func(pkt *rtp.Packet) {
+		select {
+		case <-done:
+			return
+		default:
+		}
 		nalus, err := dec.Decode(pkt)
 		if err != nil {
 			if err != rtph264.ErrMorePacketsNeeded {
@@ -93,6 +100,13 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		}
 		if len(nalus) == 0 {
 			return
+		}
+		sampleMu.Lock()
+		defer sampleMu.Unlock()
+		select {
+		case <-done:
+			return
+		default:
 		}
 		for _, n := range nalus {
 			sample.Write([]byte{0x00, 0x00, 0x00, 0x01})
@@ -117,8 +131,12 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		}
 	}()
 
+	var sampleData []byte
 	select {
 	case <-done:
+		sampleMu.Lock()
+		sampleData = bytes.Clone(sample.Bytes())
+		sampleMu.Unlock()
 	case err := <-errCh:
 		return fmt.Errorf("rtsp client: %w", err)
 	case <-ctxTimeout.Done():
@@ -133,7 +151,7 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		"-frames:v", "1",
 		outPath,
 	)
-	cmd.Stdin = bytes.NewReader(sample.Bytes())
+	cmd.Stdin = bytes.NewReader(sampleData)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg write frame: %w\n%s", err, string(out))
