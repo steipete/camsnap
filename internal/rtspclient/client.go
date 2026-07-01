@@ -8,11 +8,11 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/bluenviron/gortsplib/v4"
-	"github.com/bluenviron/gortsplib/v4/pkg/base"
-	"github.com/bluenviron/gortsplib/v4/pkg/description"
-	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
+	"github.com/bluenviron/gortsplib/v5"
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/format"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtph264"
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 	"github.com/pion/rtp"
 )
@@ -37,16 +37,16 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 
 	switch transport {
 	case "udp":
-		t := gortsplib.TransportUDP
-		cl.Transport = &t
+		p := gortsplib.ProtocolUDP
+		cl.Protocol = &p
 	case "tcp":
-		t := gortsplib.TransportTCP
-		cl.Transport = &t
+		p := gortsplib.ProtocolTCP
+		cl.Protocol = &p
 	default:
 		return fmt.Errorf("invalid transport %q", transport)
 	}
 
-	if err := cl.Start2(); err != nil {
+	if err := cl.Start(); err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
 	defer cl.Close()
