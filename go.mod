@@ -1,13 +1,13 @@
 module github.com/steipete/camsnap
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/bluenviron/gortsplib/v5 v5.6.1
 	github.com/bluenviron/mediacommon/v2 v2.9.1
 	github.com/mattn/go-isatty v0.0.22
 	github.com/muesli/termenv v0.16.0
-	github.com/pion/rtp v1.10.2
+	github.com/pion/rtp v1.10.3
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -27,7 +27,7 @@ require (
 	github.com/pion/transport/v4 v4.0.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )

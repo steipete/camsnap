@@ -37,7 +37,7 @@
 - **Motion (future)**: `internal/motion` placeholder; will plug in frame diff or gocv later.
 
 ### Tooling
-- Go 1.25; `gofmt`/`goimports`.
+- Go 1.26; `gofmt`/`goimports`.
 - `golangci-lint` with a focused rule set (vet, staticcheck, errcheck, gofmt, goimports).
 - `go test ./...`.
 - Makefile shortcuts: `fmt`, `lint`, `test`, `all`.

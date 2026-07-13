@@ -2,9 +2,11 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/steipete/camsnap/internal/config"
@@ -166,7 +168,7 @@ func TestDiscoverNoDevices(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	root := NewRootCommand("test")
 	root.SetArgs([]string{"discover", "--timeout", "10ms"})
-	if err := root.Execute(); err != nil {
+	if err := root.Execute(); err != nil && !errors.Is(err, syscall.ENETUNREACH) && !errors.Is(err, syscall.EHOSTUNREACH) {
 		t.Fatalf("discover: %v", err)
 	}
 }
