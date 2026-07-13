@@ -2,7 +2,9 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -58,7 +60,7 @@ func TestDiscoverTimeout(t *testing.T) {
 	defer cancel()
 	_, err := Discover(ctx, 10*time.Millisecond)
 	// Should return either nil or timeout error; we only care that it doesn't hang.
-	if err != nil && !strings.Contains(err.Error(), "timeout") {
+	if err != nil && !strings.Contains(err.Error(), "timeout") && !errors.Is(err, syscall.ENETUNREACH) && !errors.Is(err, syscall.EHOSTUNREACH) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

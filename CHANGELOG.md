@@ -2,7 +2,7 @@
 
 ## 0.2.3 - Unreleased
 - Redact RTSP credentials from ffmpeg failures, restore private camera-config permissions on rewrite, and safely finalize gortsplib frame buffers.
-- Migrate the gortsplib RTSP backend to the maintained v5 release and refresh runtime dependencies.
+- Migrate the gortsplib RTSP backend to the maintained v5 release, adopt Go 1.26, and refresh runtime dependencies.
 
 ## 0.2.2
 - Homebrew: install target-specific release binaries on macOS and Linux.
