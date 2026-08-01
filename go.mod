@@ -3,11 +3,11 @@ module github.com/steipete/camsnap
 go 1.26.0
 
 require (
-	github.com/bluenviron/gortsplib/v5 v5.6.1
-	github.com/bluenviron/mediacommon/v2 v2.9.1
-	github.com/mattn/go-isatty v0.0.22
+	github.com/bluenviron/gortsplib/v5 v5.6.2
+	github.com/bluenviron/mediacommon/v2 v2.9.2
+	github.com/mattn/go-isatty v0.0.24
 	github.com/muesli/termenv v0.16.0
-	github.com/pion/rtp v1.10.3
+	github.com/pion/rtp v1.10.5
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )

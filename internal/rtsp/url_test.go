@@ -68,3 +68,16 @@ func TestBuildURLWithPath(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 }
+
+func TestReplacePath(t *testing.T) {
+	base := "rtsp://user:pass@192.168.0.10:554/stream1"
+	want := "rtsp://user:pass@192.168.0.10:554/stream2"
+	for _, path := range []string{"stream2", "/stream2"} {
+		if got := ReplacePath(base, path); got != want {
+			t.Fatalf("ReplacePath(%q) = %q, want %q", path, got, want)
+		}
+	}
+	if got := ReplacePath(base, ""); got != base {
+		t.Fatalf("ReplacePath empty = %q, want %q", got, base)
+	}
+}

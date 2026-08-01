@@ -61,3 +61,17 @@ func BuildURL(cam config.Camera) (string, error) {
 
 	return fmt.Sprintf("%s://%s%s", proto, authority, path), nil
 }
+
+// ReplacePath replaces the trailing path segment of an RTSP URL.
+func ReplacePath(baseURL, path string) string {
+	if path == "" {
+		return baseURL
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	if index := strings.LastIndex(baseURL, "/"); index >= 0 {
+		return baseURL[:index] + path
+	}
+	return baseURL + path
+}

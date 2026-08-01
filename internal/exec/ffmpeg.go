@@ -2,6 +2,7 @@
 package mediaexec
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os/exec"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"time"
 )
+
+const ffmpegLogTailLines = 20
 
 var rtspURLPattern = regexp.MustCompile(`(?i)rtsps?://[^\s]+`)
 
@@ -31,6 +34,37 @@ func RunFFmpegWithOutput(ctx context.Context, args ...string) (string, error) {
 		return safeOutput, fmt.Errorf("ffmpeg %v failed: %w\n%s", safeArgs, err, safeOutput)
 	}
 	return safeOutput, nil
+}
+
+// RunFFmpegWithStderrLines streams ffmpeg stderr to a callback. It returns a
+// short log tail, an ffmpeg exit error, and any process setup or log read error.
+func RunFFmpegWithStderrLines(ctx context.Context, args []string, onLine func(string)) (string, error, error) {
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return "", nil, fmt.Errorf("stderr pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", nil, fmt.Errorf("start ffmpeg: %w", err)
+	}
+
+	logTail := make([]string, 0, ffmpegLogTailLines)
+	scanner := bufio.NewScanner(stderr)
+	for scanner.Scan() {
+		line := scanner.Text()
+		logTail = append(logTail, line)
+		if len(logTail) > ffmpegLogTailLines {
+			logTail = logTail[1:]
+		}
+		if onLine != nil {
+			onLine(line)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		_ = cmd.Wait()
+		return strings.Join(logTail, "\n"), nil, fmt.Errorf("read ffmpeg logs: %w", err)
+	}
+	return strings.Join(logTail, "\n"), cmd.Wait(), nil
 }
 
 func redactRTSPCredentials(text string) string {

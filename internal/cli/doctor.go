@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/steipete/camsnap/internal/capture"
 	mediaexec "github.com/steipete/camsnap/internal/exec"
-	"github.com/steipete/camsnap/internal/rtsp"
 )
 
 func newDoctorCmd() *cobra.Command {
@@ -55,13 +55,15 @@ func newDoctorCmd() *cobra.Command {
 					cmd.Printf("%s %s dial %s failed: %v\n", sty.Err("✖"), cam.Name, addr, err)
 					continue
 				}
-				url, err := rtsp.BuildURL(cam)
+				options, err := capture.Resolve(cam, (captureFlagValues{
+					transport: transport,
+				}).overrides(cmd))
 				if err != nil {
 					cmd.Printf("%s %s RTSP URL invalid: %v\n", sty.Err("✖"), cam.Name, err)
 					continue
 				}
 				if probe {
-					if err := probeRTSP(cmd, url, timeout+2*time.Second, authMode, transport); err != nil {
+					if err := probeRTSP(cmd, capture.ProbeArgs(options), timeout+2*time.Second, authMode); err != nil {
 						cmd.Printf("%s %s ffmpeg probe failed: %v\n", sty.Err("✖"), cam.Name, err)
 						continue
 					}
@@ -89,31 +91,16 @@ func dialOnce(addr string, timeout time.Duration) error {
 	return conn.Close()
 }
 
-func probeRTSP(_ *cobra.Command, url string, timeout time.Duration, authMode, transport string) error {
+func probeRTSP(_ *cobra.Command, args []string, timeout time.Duration, authMode string) error {
 	// retry a couple times to avoid transient RTSP setup errors
 	var lastErr error
 	var lastOut string
 	if _, ok := parseRTSPAuth(authMode); !ok {
 		return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
 	}
-	xport, ok := transportFlag(transport)
-	if !ok {
-		return fmt.Errorf("invalid --rtsp-transport (use tcp|udp)")
-	}
 
 	for attempt := 0; attempt < 3; attempt++ {
 		ctx, cancel := mediaexec.WithTimeout(context.Background(), timeout)
-		args := []string{
-			"-hide_banner",
-			"-loglevel", "error",
-			"-rtsp_transport", xport,
-		}
-		args = append(args,
-			"-i", url,
-			"-t", "1",
-			"-f", "null",
-			"-",
-		)
 		lastOut, lastErr = mediaexec.RunFFmpegWithOutput(ctx, args...)
 		cancel()
 		if lastErr == nil {

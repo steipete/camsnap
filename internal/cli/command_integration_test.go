@@ -141,6 +141,42 @@ func TestSnapCustomPathIsNotDuplicated(t *testing.T) {
 	}
 }
 
+func TestSnapResolvesCameraDefaultsAndExplicitFlags(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfgPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "camsnap", "config.yaml")
+	cfg := config.Config{Cameras: []config.Camera{{
+		Name: "cam", Host: "127.0.0.1", RTSPTransport: "udp", Stream: "stream2",
+	}}}
+	if err := config.Save(cfgPath, cfg); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+
+	ffmpegPath, argsPath := makeRecordingStubFFmpeg(t)
+	t.Setenv("PATH", ffmpegPath)
+	output := filepath.Join(t.TempDir(), "snap.jpg")
+
+	root := NewRootCommand("test")
+	root.SetArgs([]string{"--config", cfgPath, "snap", "cam", "--out", output})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("snap with camera defaults: %v", err)
+	}
+	args := readRecordedArgs(t, argsPath)
+	assertArgsContainSequence(t, args, "-rtsp_transport", "udp")
+	assertArgsContainSequence(t, args, "-i", "rtsp://127.0.0.1:554/stream2")
+
+	root = NewRootCommand("test")
+	root.SetArgs([]string{
+		"--config", cfgPath, "snap", "cam", "--out", output,
+		"--rtsp-transport", "tcp", "--stream", "stream1",
+	})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("snap with explicit flags: %v", err)
+	}
+	args = readRecordedArgs(t, argsPath)
+	assertArgsContainSequence(t, args, "-rtsp_transport", "tcp")
+	assertArgsContainSequence(t, args, "-i", "rtsp://127.0.0.1:554/stream1")
+}
+
 func TestRootVersionHelp(t *testing.T) {
 	root := NewRootCommand("test-version")
 	root.SetArgs([]string{"--version"})
@@ -232,6 +268,45 @@ func TestClipTempOutput(t *testing.T) {
 	}
 }
 
+func TestClipResolvesAudioDefaultsAndExplicitFlags(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfgPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "camsnap", "config.yaml")
+	cfg := config.Config{Cameras: []config.Camera{{
+		Name: "cam", Host: "127.0.0.1", NoAudio: true, AudioCodec: "pcm_alaw",
+	}}}
+	if err := config.Save(cfgPath, cfg); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+
+	ffmpegPath, argsPath := makeRecordingStubFFmpeg(t)
+	t.Setenv("PATH", ffmpegPath)
+	output := filepath.Join(t.TempDir(), "clip.mp4")
+
+	root := NewRootCommand("test")
+	root.SetArgs([]string{"--config", cfgPath, "clip", "cam", "--dur", "1s", "--out", output})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("clip with camera defaults: %v", err)
+	}
+	args := readRecordedArgs(t, argsPath)
+	assertArgsContainSequence(t, args, "-an")
+
+	root = NewRootCommand("test")
+	root.SetArgs([]string{
+		"--config", cfgPath, "clip", "cam", "--dur", "1s", "--out", output,
+		"--no-audio=false", "--audio-codec", "aac",
+	})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("clip with explicit flags: %v", err)
+	}
+	args = readRecordedArgs(t, argsPath)
+	assertArgsContainSequence(t, args, "-c:a", "aac")
+	for _, arg := range args {
+		if arg == "-an" {
+			t.Fatalf("explicit --no-audio=false did not override camera default: %v", args)
+		}
+	}
+}
+
 func makeStubFFmpeg(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -241,6 +316,44 @@ func makeStubFFmpeg(t *testing.T) string {
 		t.Fatalf("write stub ffmpeg: %v", err)
 	}
 	return dir
+}
+
+func makeRecordingStubFFmpeg(t *testing.T) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "ffmpeg.args")
+	script := filepath.Join(dir, "ffmpeg")
+	content := []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" >\"" + argsPath + "\"\nout=\"\"\nfor last in \"$@\"; do out=\"$last\"; done\n: >\"$out\"\nexit 0\n")
+	if err := os.WriteFile(script, content, 0o755); err != nil {
+		t.Fatalf("write stub ffmpeg: %v", err)
+	}
+	return dir, argsPath
+}
+
+func readRecordedArgs(t *testing.T, path string) []string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read ffmpeg args: %v", err)
+	}
+	return strings.Split(strings.TrimSpace(string(data)), "\n")
+}
+
+func assertArgsContainSequence(t *testing.T, args []string, sequence ...string) {
+	t.Helper()
+	for index := 0; index+len(sequence) <= len(args); index++ {
+		matches := true
+		for offset := range sequence {
+			if args[index+offset] != sequence[offset] {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return
+		}
+	}
+	t.Fatalf("ffmpeg args %v do not contain sequence %v", args, sequence)
 }
 
 func extractTempPath(t *testing.T, output string) string {

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/steipete/camsnap/internal/capture"
 	mediaexec "github.com/steipete/camsnap/internal/exec"
-	"github.com/steipete/camsnap/internal/rtsp"
 	"github.com/steipete/camsnap/internal/rtspclient"
 )
 
@@ -48,10 +48,6 @@ func newSnapCmd() *cobra.Command {
 				return fmt.Errorf("ffmpeg not found in PATH")
 			}
 
-			if stream != "" && path != "" {
-				return fmt.Errorf("use --path for custom RTSP token URLs; omit --stream")
-			}
-
 			cfgFlag, err := configPathFlag(cmd)
 			if err != nil {
 				return err
@@ -65,57 +61,27 @@ func newSnapCmd() *cobra.Command {
 				return fmt.Errorf("camera %q not found", cameraName)
 			}
 
-			if path == "" && cam.Path != "" {
-				path = cam.Path
-			}
-			if path != "" {
-				cam.Path = path
-				cam.Stream = ""
-			}
-
-			url, err := rtsp.BuildURL(cam)
-			if err != nil {
-				return err
-			}
-
-			// fall back to per-camera defaults
-			if transport == "" && cam.RTSPTransport != "" {
-				transport = cam.RTSPTransport
-			}
-			if stream == "" && cam.Stream != "" && path == "" {
-				stream = cam.Stream
-			}
-			if client == "" && cam.RTSPClient != "" {
-				client = cam.RTSPClient
-			}
-
 			if _, ok := parseRTSPAuth(authMode); !ok {
 				return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
 			}
-			xport, ok := transportFlag(transport)
-			if !ok {
-				return fmt.Errorf("invalid --rtsp-transport (use tcp|udp)")
+			options, err := capture.Resolve(cam, (captureFlagValues{
+				transport: transport,
+				stream:    stream,
+				client:    client,
+				path:      path,
+			}).overrides(cmd))
+			if err != nil {
+				return err
 			}
 
 			ctx, cancel := mediaexec.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
-			if path == "" {
-				url = appendStream(url, stream)
+			if options.Client == "gortsplib" {
+				return rtspclient.GrabFrameViaGort(ctx, options.URL, options.Transport, outPath, timeout)
 			}
 
-			if client == "gortsplib" {
-				return rtspclient.GrabFrameViaGort(ctx, url, xport, outPath, timeout)
-			}
-
-			ffArgs := []string{
-				"-y",
-				"-rtsp_transport", xport,
-				"-i", url,
-				"-frames:v", "1",
-				"-q:v", "2",
-				outPath,
-			}
+			ffArgs := capture.SnapArgs(options, outPath)
 			return mediaexec.RunFFmpeg(ctx, ffArgs...)
 		},
 	}

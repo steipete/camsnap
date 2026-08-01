@@ -16,18 +16,3 @@ func parseRTSPAuth(mode string) (string, bool) {
 		return "", false
 	}
 }
-
-// transportFlag returns the ffmpeg -rtsp_transport value.
-func transportFlag(v string) (string, bool) {
-	if v == "" {
-		return "tcp", true
-	}
-	switch strings.ToLower(v) {
-	case "tcp":
-		return "tcp", true
-	case "udp":
-		return "udp", true
-	default:
-		return "", false
-	}
-}
