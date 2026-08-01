@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	osexec "os/exec"
@@ -10,8 +9,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/steipete/camsnap/internal/capture"
 	mediaexec "github.com/steipete/camsnap/internal/exec"
-	"github.com/steipete/camsnap/internal/rtsp"
 )
 
 func newWatchCmd() *cobra.Command {
@@ -46,14 +45,6 @@ func newWatchCmd() *cobra.Command {
 			if !mediaexec.HasBinary("ffmpeg") {
 				return fmt.Errorf("ffmpeg not found in PATH")
 			}
-			if _, ok := parseRTSPAuth(authMode); !ok {
-				return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
-			}
-			xport, ok := transportFlag(transport)
-			if !ok {
-				return fmt.Errorf("invalid --rtsp-transport (use tcp|udp)")
-			}
-
 			cfgFlag, err := configPathFlag(cmd)
 			if err != nil {
 				return err
@@ -66,21 +57,17 @@ func newWatchCmd() *cobra.Command {
 			if !ok {
 				return fmt.Errorf("camera %q not found", cameraName)
 			}
-			if stream != "" && path != "" {
-				return fmt.Errorf("use --path for custom RTSP token URLs; omit --stream")
+			if _, ok := parseRTSPAuth(authMode); !ok {
+				return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
 			}
-			if path == "" && cam.Path != "" {
-				path = cam.Path
-			}
-			if path != "" {
-				cam.Path = path
-				cam.Stream = ""
-			}
-			url, err := rtsp.BuildURL(cam)
+			options, err := capture.Resolve(cam, (captureFlagValues{
+				transport: transport,
+				stream:    stream,
+				path:      path,
+			}).overrides(cmd))
 			if err != nil {
 				return err
 			}
-
 			if tmpl != "" {
 				action, err = applyTemplate(tmpl, cam.Name, 0, time.Now())
 				if err != nil {
@@ -95,7 +82,8 @@ func newWatchCmd() *cobra.Command {
 				defer cancel()
 			}
 
-			return watchMotion(ctx, cameraName, url, threshold, cooldown, action, tmpl, jsonOutput, xport, stream, path, cmd)
+			ffArgs := capture.WatchArgs(options, threshold)
+			return watchMotion(ctx, cameraName, ffArgs, cooldown, action, tmpl, jsonOutput, cmd)
 		},
 	}
 
@@ -114,45 +102,9 @@ func newWatchCmd() *cobra.Command {
 	return cmd
 }
 
-func watchMotion(ctx context.Context, cameraName, url string, threshold float64, cooldown time.Duration, action string, tmpl string, jsonOutput bool, transport string, stream string, path string, cmd *cobra.Command) error {
-	ffArgs := []string{
-		"-hide_banner",
-		"-loglevel", "info",
-		"-rtsp_transport", transport,
-	}
-	if path == "" {
-		url = appendStream(url, stream)
-	}
-	ffArgs = append(ffArgs,
-		"-i", url,
-		"-an",
-		"-sn",
-		"-dn",
-		"-vf", fmt.Sprintf("select='gt(scene\\,%0.3f)',metadata=print", threshold),
-		"-f", "null",
-		"-",
-	)
-
-	ff := osexec.CommandContext(ctx, "ffmpeg", ffArgs...)
-	stderr, err := ff.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("stderr pipe: %w", err)
-	}
-
-	if err := ff.Start(); err != nil {
-		return fmt.Errorf("start ffmpeg: %w", err)
-	}
-
+func watchMotion(ctx context.Context, cameraName string, ffArgs []string, cooldown time.Duration, action string, tmpl string, jsonOutput bool, cmd *cobra.Command) error {
 	lastTrigger := time.Time{}
-	var logBuf []string
-	scanner := bufio.NewScanner(stderr)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// keep last ~20 lines for error classification
-		logBuf = append(logBuf, line)
-		if len(logBuf) > 20 {
-			logBuf = logBuf[1:]
-		}
+	logTail, exitErr, err := mediaexec.RunFFmpegWithStderrLines(ctx, ffArgs, func(line string) {
 		if score, ok := parseSceneScore(line); ok {
 			now := time.Now()
 			if lastTrigger.IsZero() || now.Sub(lastTrigger) >= cooldown {
@@ -171,14 +123,13 @@ func watchMotion(ctx context.Context, cameraName, url string, threshold float64,
 				runAction(ctx, act, score, now, cameraName)
 			}
 		}
+	})
+	if err != nil {
+		return err
 	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read ffmpeg logs: %w", err)
-	}
-
-	if err := ff.Wait(); err != nil && ctx.Err() == nil {
-		class := mediaexec.ClassifyError(strings.Join(logBuf, "\n"))
-		return fmt.Errorf("ffmpeg exited: %w (%s)", err, class)
+	if exitErr != nil && ctx.Err() == nil {
+		class := mediaexec.ClassifyError(logTail)
+		return fmt.Errorf("ffmpeg exited: %w (%s)", exitErr, class)
 	}
 	return nil
 }

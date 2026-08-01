@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/steipete/camsnap/internal/capture"
 	mediaexec "github.com/steipete/camsnap/internal/exec"
-	"github.com/steipete/camsnap/internal/rtsp"
 )
 
 func newClipCmd() *cobra.Command {
@@ -64,40 +64,16 @@ func newClipCmd() *cobra.Command {
 				return fmt.Errorf("camera %q not found", cameraName)
 			}
 
-			if stream != "" && path != "" {
-				return fmt.Errorf("use --path for custom RTSP token URLs; omit --stream")
-			}
-
-			if path == "" && cam.Path != "" {
-				path = cam.Path
-			}
-			if path != "" {
-				cam.Path = path
-				cam.Stream = ""
-			}
-
-			// per-camera defaults
-			if transport == "" && cam.RTSPTransport != "" {
-				transport = cam.RTSPTransport
-			}
-			if stream == "" && cam.Stream != "" && path == "" {
-				stream = cam.Stream
-			}
-			if !noAudio && cam.NoAudio {
-				noAudio = true
-			}
-			if audioCodec == "" && cam.AudioCodec != "" {
-				audioCodec = cam.AudioCodec
-			}
-
 			if _, ok := parseRTSPAuth(authMode); !ok {
 				return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
 			}
-			xport, ok := transportFlag(transport)
-			if !ok {
-				return fmt.Errorf("invalid --rtsp-transport (use tcp|udp)")
-			}
-			url, err := rtsp.BuildURL(cam)
+			options, err := capture.Resolve(cam, (captureFlagValues{
+				transport:  transport,
+				stream:     stream,
+				path:       path,
+				noAudio:    noAudio,
+				audioCodec: audioCodec,
+			}).overrides(cmd))
 			if err != nil {
 				return err
 			}
@@ -105,29 +81,7 @@ func newClipCmd() *cobra.Command {
 			ctx, cancel := mediaexec.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
-			if path == "" {
-				url = appendStream(url, stream)
-			}
-
-			ffArgs := []string{
-				"-y",
-				"-rtsp_transport", xport,
-				"-i", url,
-				"-t", fmt.Sprintf("%.0f", duration.Seconds()),
-			}
-			// Video: copy
-			ffArgs = append(ffArgs, "-c:v", "copy")
-			if noAudio {
-				ffArgs = append(ffArgs, "-an")
-			} else {
-				if audioCodec == "" {
-					// safe default for mp4
-					ffArgs = append(ffArgs, "-c:a", "aac")
-				} else {
-					ffArgs = append(ffArgs, "-c:a", audioCodec)
-				}
-			}
-			ffArgs = append(ffArgs, outPath)
+			ffArgs := capture.ClipArgs(options, duration, outPath)
 			return mediaexec.RunFFmpeg(ctx, ffArgs...)
 		},
 	}

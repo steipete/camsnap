@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/steipete/camsnap/internal/capture"
 	"github.com/steipete/camsnap/internal/config"
 )
 
@@ -36,37 +37,38 @@ func findCamera(cfg config.Config, name string) (config.Camera, bool) {
 	return config.FindCamera(cfg, name)
 }
 
-// appendStream swaps the path to the desired stream if provided.
-func appendStream(baseURL, stream string) string {
-	if stream == "" {
-		return baseURL
-	}
-	if stream[0] != '/' {
-		stream = "/" + stream
-	}
-	// replace last path segment
-	for i := len(baseURL) - 1; i >= 0; i-- {
-		if baseURL[i] == '/' {
-			return baseURL[:i] + stream
-		}
-	}
-	return baseURL + stream
+type captureFlagValues struct {
+	transport  string
+	stream     string
+	client     string
+	path       string
+	noAudio    bool
+	audioCodec string
 }
 
-// appendPath replaces the trailing path of an RTSP URL with a custom path.
-func appendPath(baseURL, path string) string {
-	if path == "" {
-		return baseURL
+func (values captureFlagValues) overrides(cmd *cobra.Command) capture.Overrides {
+	return capture.Overrides{
+		Transport:  changedString(cmd, "rtsp-transport", values.transport),
+		Stream:     changedString(cmd, "stream", values.stream),
+		Client:     changedString(cmd, "rtsp-client", values.client),
+		Path:       changedString(cmd, "path", values.path),
+		NoAudio:    changedBool(cmd, "no-audio", values.noAudio),
+		AudioCodec: changedString(cmd, "audio-codec", values.audioCodec),
 	}
-	if path[0] != '/' {
-		path = "/" + path
+}
+
+func changedString(cmd *cobra.Command, name, value string) *string {
+	if cmd.Flags().Changed(name) {
+		return &value
 	}
-	for i := len(baseURL) - 1; i >= 0; i-- {
-		if baseURL[i] == '/' {
-			return baseURL[:i] + path
-		}
+	return nil
+}
+
+func changedBool(cmd *cobra.Command, name string, value bool) *bool {
+	if cmd.Flags().Changed(name) {
+		return &value
 	}
-	return baseURL + path
+	return nil
 }
 
 // loadConfigFromFlag reads the persistent config flag off a command and loads the config.
