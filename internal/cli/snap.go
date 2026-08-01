@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -21,17 +22,41 @@ func newSnapCmd() *cobra.Command {
 	var stream string
 	var client string
 	var path string
+	var device string
+	var framerate int
+	var videoSize string
+	var warmup time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "snap",
 		Short: "Capture a single frame to a file",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// allow positional camera name if --camera not set
-			if cameraName == "" && len(args) > 0 {
-				cameraName = args[0]
+			if !mediaexec.HasBinary("ffmpeg") {
+				return fmt.Errorf("ffmpeg not found in PATH")
 			}
-			if cameraName == "" {
-				return fmt.Errorf("--camera is required")
+			cam, selectedName, err := selectCaptureCamera(cmd, args, cameraName, device)
+			if err != nil {
+				return err
+			}
+			cameraName = selectedName
+			options, err := capture.Resolve(cam, (captureFlagValues{
+				transport: transport,
+				stream:    stream,
+				client:    client,
+				path:      path,
+				rtspAuth:  authMode,
+				device:    device,
+				framerate: framerate,
+				videoSize: videoSize,
+				warmup:    warmup,
+			}).overrides(cmd))
+			if err != nil {
+				return err
+			}
+			if options.Kind == capture.KindRTSP {
+				if _, ok := parseRTSPAuth(authMode); !ok {
+					return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
+				}
 			}
 			if outPath == "" {
 				tmp, err := os.CreateTemp("", "camsnap-*.jpg")
@@ -44,44 +69,21 @@ func newSnapCmd() *cobra.Command {
 				outPath = tmp.Name()
 				cmd.Printf("No --out provided, writing snapshot to %s\n", outPath)
 			}
-			if !mediaexec.HasBinary("ffmpeg") {
-				return fmt.Errorf("ffmpeg not found in PATH")
-			}
-
-			cfgFlag, err := configPathFlag(cmd)
-			if err != nil {
-				return err
-			}
-			cfg, _, err := loadConfig(cfgFlag)
-			if err != nil {
-				return err
-			}
-			cam, ok := findCamera(cfg, cameraName)
-			if !ok {
-				return fmt.Errorf("camera %q not found", cameraName)
-			}
-
-			if _, ok := parseRTSPAuth(authMode); !ok {
-				return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
-			}
-			options, err := capture.Resolve(cam, (captureFlagValues{
-				transport: transport,
-				stream:    stream,
-				client:    client,
-				path:      path,
-			}).overrides(cmd))
-			if err != nil {
-				return err
-			}
 
 			ctx, cancel := mediaexec.WithTimeout(context.Background(), timeout)
 			defer cancel()
+			if options.Kind == capture.KindLocal {
+				return runLocalCapture(ctx, localCaptureRequest{operation: localSnap, options: options, output: outPath})
+			}
 
 			if options.Client == "gortsplib" {
 				return rtspclient.GrabFrameViaGort(ctx, options.URL, options.Transport, outPath, timeout)
 			}
 
-			ffArgs := capture.SnapArgs(options, outPath)
+			ffArgs, err := capture.SnapArgs(options, outPath, runtime.GOOS)
+			if err != nil {
+				return err
+			}
 			return mediaexec.RunFFmpeg(ctx, ffArgs...)
 		},
 	}
@@ -94,6 +96,10 @@ func newSnapCmd() *cobra.Command {
 	cmd.Flags().StringVar(&stream, "stream", "", "RTSP path segment (stream1 or stream2); ignored if --path is set")
 	cmd.Flags().StringVar(&path, "path", "", "Custom RTSP path (overrides --stream), e.g., /Bfy... from UniFi Protect")
 	cmd.Flags().StringVar(&client, "rtsp-client", "ffmpeg", "RTSP client: ffmpeg|gortsplib")
+	cmd.Flags().StringVar(&device, "device", "", "Local video device index, name, or /dev/videoN path")
+	cmd.Flags().IntVar(&framerate, "framerate", 30, "Local capture framerate")
+	cmd.Flags().StringVar(&videoSize, "video-size", "", "Local capture size (e.g., 1280x720)")
+	cmd.Flags().DurationVar(&warmup, "warmup", time.Second, "Local camera auto-exposure warmup")
 
 	return cmd
 }

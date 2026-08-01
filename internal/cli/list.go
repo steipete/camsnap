@@ -29,6 +29,10 @@ func newListCmd() *cobra.Command {
 			sort.Slice(cfg.Cameras, func(i, j int) bool { return cfg.Cameras[i].Name < cfg.Cameras[j].Name })
 
 			for _, cam := range cfg.Cameras {
+				if strings.EqualFold(cam.Protocol, "local") {
+					cmd.Printf("%-12s device=%s proto=local\n", cam.Name, cam.Device)
+					continue
+				}
 				// avoid printing password
 				auth := cam.Username
 				if auth != "" && cam.Password != "" {

@@ -12,7 +12,7 @@ import (
 func NewRootCommand(version string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "camsnap",
-		Short:         "camsnap captures frames and clips from RTSP cameras (Tapo first, Ubiquiti next)",
+		Short:         "camsnap captures frames and clips from RTSP cameras and local webcams",
 		Long:          colorizeLong(),
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -30,6 +30,7 @@ func NewRootCommand(version string) *cobra.Command {
 		newSnapCmd(),
 		newClipCmd(),
 		newDiscoverCmd(),
+		newDevicesCmd(),
 		newWatchCmd(),
 		newDoctorCmd(),
 		newVersionCmd(version),
@@ -50,6 +51,8 @@ func exampleText() string {
 	var b strings.Builder
 	b.WriteString("  camsnap add --name kitchen --host 192.168.0.175 --user tapo --pass secret --rtsp-transport udp --stream stream2\n")
 	b.WriteString("  camsnap snap kitchen --out shot.jpg\n")
+	b.WriteString("  camsnap snap --device 0 --out webcam.jpg\n")
+	b.WriteString("  camsnap devices\n")
 	b.WriteString("  camsnap clip kitchen --dur 5s --no-audio --out clip.mp4\n")
 	b.WriteString("  camsnap watch kitchen --threshold 0.2 --cooldown 5s --json --action 'touch /tmp/motion'\n")
 	b.WriteString("  camsnap doctor --probe --rtsp-transport udp\n")
@@ -63,7 +66,7 @@ func colorizeLong() string {
 	r := termenv.String().Foreground(p.Color("#e53935")).Styled
 
 	return fmt.Sprintf("%s %s\n\n%s\n  %s\n  %s\n  %s\n",
-		b("camsnap"), "– capture frames/clips and motion from RTSP/ONVIF cameras.",
+		b("camsnap"), "– capture frames/clips and motion from RTSP/ONVIF cameras and local webcams.",
 		b("Common commands:"),
 		g("snap")+"     grab a frame (positional camera name allowed)",
 		g("clip")+"     short clip; drop audio with --no-audio",

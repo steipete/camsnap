@@ -1,7 +1,9 @@
 package capture
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/steipete/camsnap/internal/config"
 )
@@ -37,6 +39,61 @@ func TestResolvePrecedence(t *testing.T) {
 	}
 	if want := "rtsp://192.0.2.10:554/stream3"; got.URL != want {
 		t.Fatalf("URL = %q, want %q", got.URL, want)
+	}
+}
+
+func TestResolveLocalDefaultsAndOverrides(t *testing.T) {
+	framerate := 60
+	videoSize := "1920x1080"
+	warmup := 2 * time.Second
+	got, err := Resolve(config.Camera{Protocol: "local", Device: "0"}, Overrides{
+		Framerate: &framerate,
+		VideoSize: &videoSize,
+		Warmup:    &warmup,
+	})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	want := Options{
+		Kind: KindLocal, Device: "0", Framerate: 60, VideoSize: "1920x1080", Warmup: 2 * time.Second, NoAudio: true,
+	}
+	if got != want {
+		t.Fatalf("Resolve = %#v, want %#v", got, want)
+	}
+
+	got, err = Resolve(config.Camera{Protocol: "LOCAL", Device: "FaceTime HD Camera"}, Overrides{})
+	if err != nil {
+		t.Fatalf("Resolve defaults: %v", err)
+	}
+	if got.Framerate != 30 || got.Warmup != time.Second || got.Device != "FaceTime HD Camera" {
+		t.Fatalf("local defaults not applied: %#v", got)
+	}
+}
+
+func TestResolveLocalValidation(t *testing.T) {
+	tcp := "tcp"
+	device := "0"
+	zero := 0
+	zeroDuration := time.Duration(0)
+	tests := []struct {
+		name      string
+		cam       config.Camera
+		overrides Overrides
+		contains  string
+	}{
+		{name: "missing device", cam: config.Camera{Protocol: "local"}, contains: "requires --device"},
+		{name: "RTSP flag", cam: config.Camera{Protocol: "local", Device: "0"}, overrides: Overrides{Transport: &tcp}, contains: "RTSP and audio flags"},
+		{name: "local flag on RTSP", cam: config.Camera{Host: "192.0.2.1"}, overrides: Overrides{Device: &device}, contains: "only valid for local cameras"},
+		{name: "zero framerate", cam: config.Camera{Protocol: "local", Device: "0"}, overrides: Overrides{Framerate: &zero}, contains: "--framerate must be > 0"},
+		{name: "zero warmup", cam: config.Camera{Protocol: "local", Device: "0"}, overrides: Overrides{Warmup: &zeroDuration}, contains: "--warmup must be > 0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Resolve(tt.cam, tt.overrides)
+			if err == nil || !strings.Contains(err.Error(), tt.contains) {
+				t.Fatalf("Resolve error = %v, want substring %q", err, tt.contains)
+			}
+		})
 	}
 }
 

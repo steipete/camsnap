@@ -13,9 +13,13 @@ func TestClassifyError(t *testing.T) {
 	}{
 		{"401 Unauthorized", "auth"},
 		{"Server returned 401 unauthorized", "auth"},
+		{"Operation not permitted", "permission"},
+		{"Failed to create AVCaptureDeviceInput", "permission"},
+		{"Not Authorized To Capture Video", "permission"},
 		{"Connection refused", "network-refused"},
 		{"timed out", "network-timeout"},
 		{"not found", "not-found"},
+		{"/dev/video9: No such file or directory", "not-found"},
 		{"weird message", "unknown"},
 	}
 	for _, c := range cases {

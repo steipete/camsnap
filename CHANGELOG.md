@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.2.3 - Unreleased
+- Add first-class local webcam capture through macOS AVFoundation and Linux v4l2, including device enumeration, warm snapshot capture, video-only clips, motion watch, doctor probes, and TCC-aware errors.
+- Fix capture commands ignoring per-camera defaults when their flags had non-empty application defaults (PR #9).
 - Redact RTSP credentials from ffmpeg failures, restore private camera-config permissions on rewrite, and safely finalize gortsplib frame buffers.
 - Migrate the gortsplib RTSP backend to the maintained v5 release, adopt Go 1.26, and refresh runtime dependencies.
 
