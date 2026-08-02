@@ -62,7 +62,7 @@ func runLocalCapture(ctx context.Context, request localCaptureRequest) error {
 		if request.notice != nil {
 			request.notice(fmt.Sprintf("Native AVFoundation capture failed (%v); falling back to ffmpeg.", err))
 		}
-		request.options.Device = fallbackDevice
+		request = withFFmpegFallbackDevice(request, fallbackDevice)
 	}
 
 	if request.operation != localSnap {
@@ -71,6 +71,11 @@ func runLocalCapture(ctx context.Context, request localCaptureRequest) error {
 		}
 	}
 	return runLocalFFmpeg(ctx, request)
+}
+
+func withFFmpegFallbackDevice(request localCaptureRequest, device string) localCaptureRequest {
+	request.options.Device = device
+	return request
 }
 
 func runLocalFFmpeg(ctx context.Context, request localCaptureRequest) error {

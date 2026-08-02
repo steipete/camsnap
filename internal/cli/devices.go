@@ -36,6 +36,7 @@ func newDevicesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "devices",
 		Short: "List local video capture devices",
+		Long:  "List local video capture devices. On macOS, save cameras by AVFoundation unique ID or exact name; numeric indices can differ between backends and change with attached hardware.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			backend := capture.LocalBackendFFmpeg
 			authorizationStatus := ""

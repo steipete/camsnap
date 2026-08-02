@@ -67,14 +67,14 @@ go run ./cmd/camsnap doctor --probe --rtsp-transport udp
 
 ## Local webcams
 
-List local video inputs, then either save one in the camera config or use it ad hoc. Official macOS builds use native AVFoundation for this command and for snapshots; a macOS device can be its unique ID, exact name, or the integer index implied by the listed order. Linux and macOS builds without cgo use ffmpeg-backed enumeration; on Linux use a `/dev/videoN` path.
+List local video inputs, then either save one in the camera config or use it ad hoc. Official macOS builds use native AVFoundation for this command and for snapshots; a macOS device can be its unique ID, exact name, or the integer index implied by the listed order. When saving a macOS camera, prefer its AVFoundation unique ID (or exact name): numeric indices can differ between the native and ffmpeg backends and can change when hardware is attached or removed. Reserve indices for convenient one-off captures. Linux and macOS builds without cgo use ffmpeg-backed enumeration; on Linux use a `/dev/videoN` path.
 
 ```sh
 camsnap devices
 camsnap devices --json
 
-# Save a macOS camera, then use the same snap/clip/watch commands as RTSP cameras.
-camsnap add --name mbp --protocol local --device 0 --local-backend native
+# Save a macOS camera by the ID shown by `camsnap devices`, then use the same snap/clip/watch commands as RTSP cameras.
+camsnap add --name mbp --protocol local --device '<avfoundation-unique-id>' --local-backend native
 camsnap snap mbp --out shot.jpg
 camsnap clip mbp --dur 5s --out clip.mp4
 camsnap watch mbp --threshold 0.2 --action 'touch /tmp/motion'

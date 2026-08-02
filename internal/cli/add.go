@@ -80,7 +80,7 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cam.Protocol, "protocol", "rtsp", "Protocol (rtsp, rtsps, or local)")
 	cmd.Flags().StringVar(&cam.Username, "user", "", "Camera username")
 	cmd.Flags().StringVar(&cam.Password, "pass", "", "Camera password")
-	cmd.Flags().StringVar(&cam.Device, "device", "", "Local video device index, name, or /dev/videoN path")
+	cmd.Flags().StringVar(&cam.Device, "device", "", "Local video device unique ID or exact name (recommended on macOS), index, or /dev/videoN path")
 	cmd.Flags().StringVar(&cam.LocalBackend, "local-backend", "", "Local snapshot backend (native|ffmpeg)")
 	cmd.Flags().StringVar(&cam.Path, "path", "", "Explicit RTSP path (e.g., /Bfy... token from UniFi Protect)")
 	cmd.Flags().StringVar(&cam.RTSPTransport, "rtsp-transport", "", "Preferred RTSP transport for this camera (tcp|udp)")

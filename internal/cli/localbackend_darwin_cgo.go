@@ -46,8 +46,10 @@ func nativeCaptureFrame(device string, warmup time.Duration, output string) (str
 	if err != nil {
 		return device, err
 	}
-	return resolved.Index, avf.CaptureFrame(resolved.ID, warmup, output)
+	return nativeFFmpegFallbackSelector(resolved), avf.CaptureFrame(resolved.ID, warmup, output)
 }
+
+func nativeFFmpegFallbackSelector(device localDevice) string { return device.Name }
 
 func resolveNativeDevice(devices []localDevice, selector string) (localDevice, error) {
 	if index, err := strconv.Atoi(selector); err == nil {
