@@ -27,7 +27,7 @@ builds:
           - CGO_CFLAGS=-arch arm64
           - CGO_LDFLAGS=-arch arm64
         ldflags:
-          - '-linkmode external -extldflags "-Wl,-sectcreate,__TEXT,__info_plist,{{ .Env.PWD }}/internal/avf/Info.plist"'
+          - '-s -w -X main.version={{ .Version }} -linkmode external -extldflags "-Wl,-sectcreate,__TEXT,__info_plist,{{ .Env.PWD }}/internal/avf/Info.plist"'
       - goos: darwin
         goarch: amd64
         env:
@@ -36,7 +36,7 @@ builds:
           - CGO_CFLAGS=-arch x86_64
           - CGO_LDFLAGS=-arch x86_64
         ldflags:
-          - '-linkmode external -extldflags "-Wl,-sectcreate,__TEXT,__info_plist,{{ .Env.PWD }}/internal/avf/Info.plist"'
+          - '-s -w -X main.version={{ .Version }} -linkmode external -extldflags "-Wl,-sectcreate,__TEXT,__info_plist,{{ .Env.PWD }}/internal/avf/Info.plist"'
     hooks:
       post:
         - cmd: './scripts/sign-darwin.sh "{{ .Path }}"'
