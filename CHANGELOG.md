@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.3 - Unreleased
+## 0.3.0 - Unreleased
 - Fix native-to-ffmpeg snapshot fallback selecting the wrong camera when backend device orders differ.
 - Add native AVFoundation snapshots, device enumeration, and Camera permission handling to cgo-enabled macOS builds, plus plist-embedded and signed Darwin release artifacts.
 - Add first-class local webcam capture through macOS AVFoundation and Linux v4l2, including device enumeration, warm snapshot capture, video-only clips, motion watch, doctor probes, and TCC-aware errors.
