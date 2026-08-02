@@ -75,6 +75,7 @@ func TestResolveLocalValidation(t *testing.T) {
 	device := "0"
 	zero := 0
 	zeroDuration := time.Duration(0)
+	invalidBackend := "quicktime"
 	tests := []struct {
 		name      string
 		cam       config.Camera
@@ -86,6 +87,7 @@ func TestResolveLocalValidation(t *testing.T) {
 		{name: "local flag on RTSP", cam: config.Camera{Host: "192.0.2.1"}, overrides: Overrides{Device: &device}, contains: "only valid for local cameras"},
 		{name: "zero framerate", cam: config.Camera{Protocol: "local", Device: "0"}, overrides: Overrides{Framerate: &zero}, contains: "--framerate must be > 0"},
 		{name: "zero warmup", cam: config.Camera{Protocol: "local", Device: "0"}, overrides: Overrides{Warmup: &zeroDuration}, contains: "--warmup must be > 0"},
+		{name: "invalid backend", cam: config.Camera{Protocol: "local", Device: "0"}, overrides: Overrides{LocalBackend: &invalidBackend}, contains: "invalid --local-backend"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -94,6 +96,17 @@ func TestResolveLocalValidation(t *testing.T) {
 				t.Fatalf("Resolve error = %v, want substring %q", err, tt.contains)
 			}
 		})
+	}
+}
+
+func TestResolveLocalBackendPrecedence(t *testing.T) {
+	ffmpeg := LocalBackendFFmpeg
+	got, err := Resolve(config.Camera{Protocol: "local", Device: "0", LocalBackend: LocalBackendNative}, Overrides{LocalBackend: &ffmpeg})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if got.LocalBackend != LocalBackendFFmpeg {
+		t.Fatalf("LocalBackend = %q, want %q", got.LocalBackend, LocalBackendFFmpeg)
 	}
 }
 

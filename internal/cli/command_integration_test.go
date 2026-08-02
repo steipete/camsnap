@@ -40,7 +40,7 @@ func TestAddLocalCameraAndList(t *testing.T) {
 	cfgPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "camsnap", "config.yaml")
 
 	root := NewRootCommand("test")
-	root.SetArgs([]string{"--config", cfgPath, "add", "--name", "mbp", "--protocol", "local", "--device", "0"})
+	root.SetArgs([]string{"--config", cfgPath, "add", "--name", "mbp", "--protocol", "local", "--device", "0", "--local-backend", "ffmpeg"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("add local execute: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestAddLocalCameraAndList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if len(cfg.Cameras) != 1 || cfg.Cameras[0].Protocol != "local" || cfg.Cameras[0].Device != "0" || cfg.Cameras[0].Host != "" {
+	if len(cfg.Cameras) != 1 || cfg.Cameras[0].Protocol != "local" || cfg.Cameras[0].Device != "0" || cfg.Cameras[0].LocalBackend != "ffmpeg" || cfg.Cameras[0].Host != "" {
 		t.Fatalf("local camera config = %#v", cfg.Cameras)
 	}
 
@@ -74,6 +74,8 @@ func TestAddLocalCameraValidation(t *testing.T) {
 		{name: "device required", args: []string{"add", "--name", "mbp", "--protocol", "local"}, want: "--device is required"},
 		{name: "host rejected", args: []string{"add", "--name", "mbp", "--protocol", "local", "--device", "0", "--host", "localhost"}, want: "--host is not valid"},
 		{name: "RTSP flag rejected", args: []string{"add", "--name", "mbp", "--protocol", "local", "--device", "0", "--rtsp-transport", "udp"}, want: "--rtsp-transport is not valid"},
+		{name: "local backend rejected for RTSP", args: []string{"add", "--name", "front", "--host", "192.0.2.1", "--local-backend", "native"}, want: "--local-backend is only valid"},
+		{name: "invalid local backend", args: []string{"add", "--name", "mbp", "--protocol", "local", "--device", "0", "--local-backend", "quicktime"}, want: "invalid --local-backend"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -94,7 +96,7 @@ func TestSnapAdHocLocalDevice(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "snap.jpg")
 
 	root := NewRootCommand("test")
-	root.SetArgs([]string{"snap", "--device", "0", "--framerate", "24", "--video-size", "1280x720", "--warmup", "1500ms", "--out", output})
+	root.SetArgs([]string{"snap", "--device", "0", "--local-backend", "ffmpeg", "--framerate", "24", "--video-size", "1280x720", "--warmup", "1500ms", "--out", output})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("snap local: %v", err)
 	}

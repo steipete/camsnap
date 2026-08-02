@@ -18,6 +18,13 @@ const (
 	defaultWarmup     = time.Second
 )
 
+const (
+	// LocalBackendNative captures local snapshots through the platform-native implementation.
+	LocalBackendNative = "native"
+	// LocalBackendFFmpeg captures local media through ffmpeg.
+	LocalBackendFFmpeg = "ffmpeg"
+)
+
 // Kind identifies the source feeding a capture operation.
 type Kind uint8
 
@@ -31,33 +38,35 @@ const (
 // Overrides contains only flag values explicitly supplied by the user.
 // Nil fields allow camera settings to take precedence over CLI defaults.
 type Overrides struct {
-	Transport  *string
-	Stream     *string
-	Client     *string
-	Path       *string
-	RTSPAuth   *string
-	NoAudio    *bool
-	AudioCodec *string
-	Device     *string
-	Framerate  *int
-	VideoSize  *string
-	Warmup     *time.Duration
+	Transport    *string
+	Stream       *string
+	Client       *string
+	Path         *string
+	RTSPAuth     *string
+	NoAudio      *bool
+	AudioCodec   *string
+	Device       *string
+	Framerate    *int
+	VideoSize    *string
+	Warmup       *time.Duration
+	LocalBackend *string
 }
 
 // Options is the fully resolved capture configuration consumed by arg builders.
 type Options struct {
-	Kind       Kind
-	URL        string
-	Transport  string
-	Stream     string
-	Client     string
-	Path       string
-	NoAudio    bool
-	AudioCodec string
-	Device     string
-	Framerate  int
-	VideoSize  string
-	Warmup     time.Duration
+	Kind         Kind
+	URL          string
+	Transport    string
+	Stream       string
+	Client       string
+	Path         string
+	NoAudio      bool
+	AudioCodec   string
+	Device       string
+	Framerate    int
+	VideoSize    string
+	Warmup       time.Duration
+	LocalBackend string
 }
 
 // Resolve applies explicit flag, camera config, and application defaults in order.
@@ -65,8 +74,8 @@ func Resolve(cam config.Camera, overrides Overrides) (Options, error) {
 	if strings.EqualFold(cam.Protocol, "local") {
 		return resolveLocal(cam, overrides)
 	}
-	if overrides.Device != nil || overrides.Framerate != nil || overrides.VideoSize != nil || overrides.Warmup != nil {
-		return Options{}, fmt.Errorf("--device, --framerate, --video-size, and --warmup are only valid for local cameras")
+	if overrides.Device != nil || overrides.Framerate != nil || overrides.VideoSize != nil || overrides.Warmup != nil || overrides.LocalBackend != nil {
+		return Options{}, fmt.Errorf("--device, --framerate, --video-size, --warmup, and --local-backend are only valid for local cameras")
 	}
 	if nonEmpty(overrides.Stream) && nonEmpty(overrides.Path) {
 		return Options{}, fmt.Errorf("use --path for custom RTSP token URLs; omit --stream")
@@ -127,14 +136,19 @@ func resolveLocal(cam config.Camera, overrides Overrides) (Options, error) {
 	if warmup <= 0 {
 		return Options{}, fmt.Errorf("--warmup must be > 0")
 	}
+	localBackend := strings.ToLower(stringValue(overrides.LocalBackend, cam.LocalBackend, ""))
+	if localBackend != "" && localBackend != LocalBackendNative && localBackend != LocalBackendFFmpeg {
+		return Options{}, fmt.Errorf("invalid --local-backend (use native|ffmpeg)")
+	}
 
 	return Options{
-		Kind:      KindLocal,
-		Device:    device,
-		Framerate: framerate,
-		VideoSize: stringValue(overrides.VideoSize, "", ""),
-		Warmup:    warmup,
-		NoAudio:   true,
+		Kind:         KindLocal,
+		Device:       device,
+		Framerate:    framerate,
+		VideoSize:    stringValue(overrides.VideoSize, "", ""),
+		Warmup:       warmup,
+		LocalBackend: localBackend,
+		NoAudio:      true,
 	}, nil
 }
 

@@ -2,7 +2,7 @@
 
 ## Install / Run
 - Homebrew (installs `ffmpeg` automatically): `brew install steipete/tap/camsnap`
-- Requirements for source run: Go 1.26+ and `ffmpeg` on PATH. Local webcams use AVFoundation on macOS and v4l2 on Linux; Windows is not supported.
+- Requirements for source run: Go 1.26+ and `ffmpeg` on PATH. Local snapshots and device listing use native AVFoundation in cgo-enabled macOS builds; clips and motion watch still use ffmpeg. Linux uses v4l2, and Windows local webcams are not supported.
 - Run in-place: `go run ./cmd/camsnap --help`
 - Run in Docker: `docker run --rm ghcr.io/steipete/camsnap --help`  
   Mount volumes for persistent config and output:
@@ -15,7 +15,7 @@
 
 ## Config
 - Stored at `~/.config/camsnap/config.yaml` (XDG).
-- Per-camera defaults supported: `rtsp_transport`, `stream`, `rtsp_client`, `no_audio`, `audio_codec`, `path` (for tokenized RTSP such as UniFi Protect).
+- Per-camera defaults supported: `rtsp_transport`, `stream`, `rtsp_client`, `local_backend`, `no_audio`, `audio_codec`, `path` (for tokenized RTSP such as UniFi Protect).
 
 ### Add a camera
 ```sh
@@ -67,26 +67,29 @@ go run ./cmd/camsnap doctor --probe --rtsp-transport udp
 
 ## Local webcams
 
-List the local video inputs that ffmpeg can see, then either save one in the camera config or use it ad hoc. On macOS the device can be an AVFoundation index or name; on Linux use a `/dev/videoN` path.
+List local video inputs, then either save one in the camera config or use it ad hoc. Official macOS builds use native AVFoundation for this command and for snapshots; a macOS device can be its unique ID, exact name, or the integer index implied by the listed order. Linux and macOS builds without cgo use ffmpeg-backed enumeration; on Linux use a `/dev/videoN` path.
 
 ```sh
 camsnap devices
 camsnap devices --json
 
 # Save a macOS camera, then use the same snap/clip/watch commands as RTSP cameras.
-camsnap add --name mbp --protocol local --device 0
+camsnap add --name mbp --protocol local --device 0 --local-backend native
 camsnap snap mbp --out shot.jpg
 camsnap clip mbp --dur 5s --out clip.mp4
 camsnap watch mbp --threshold 0.2 --action 'touch /tmp/motion'
 
 # Or capture without adding a camera first.
 camsnap snap --device 0 --framerate 30 --video-size 1280x720 --warmup 1s --out shot.jpg
+camsnap snap --device 0 --local-backend ffmpeg --out ffmpeg-shot.jpg
 camsnap clip --device /dev/video0 --dur 5s --out clip.mp4
 ```
 
-Local snapshots warm up the camera before keeping the final JPEG so auto-exposure can settle. Local clips are video-only for now: camsnap encodes H.264 and does not request microphone access.
+`--local-backend native|ffmpeg` mirrors the per-camera `local_backend` setting. Native is the default when compiled into a cgo-enabled macOS build; ffmpeg is the default elsewhere and is always used for clip/watch. Selecting `native` in a build where it is unavailable returns an error. Local snapshots warm up the camera before keeping the final JPEG so auto-exposure can settle. Local clips are video-only for now: camsnap encodes H.264 and does not request microphone access.
 
-On macOS, Camera permission belongs to the terminal or application that launches camsnap—not to the `camsnap` binary itself. Grant that launcher access in **System Settings → Privacy & Security → Camera**. An SSH session cannot display the macOS permission prompt; if access was previously denied, run `tccutil reset Camera` locally and retry from the launching terminal. Continuity Camera is listed only while the iPhone is nearby and unlocked.
+On macOS, the signed native build performs the Camera permission request itself. TCC still follows responsible-process rules: a terminal launch normally attributes Camera access to Terminal, iTerm, or the other launching terminal, while a signed camsnap binary launched directly from launchd or a script is attributed to camsnap. Grant the entry macOS shows in **System Settings → Privacy & Security → Camera**. An SSH session cannot display the permission prompt; if access was previously denied, run `tccutil reset Camera` locally and retry from a local launch. Continuity Camera is listed only while the iPhone is nearby and unlocked.
+
+Use `make build` for a local macOS binary with the required embedded usage-description plist and an ad-hoc signature. Set `CAMSNAP_CODESIGN_IDENTITY` to use a local Developer ID identity instead. The official release artifacts carry the same plist and are signed in the release workflow.
 
 Direct local-device capture is not supported from the camsnap Docker image. Windows local webcams are also unsupported; RTSP cameras continue to work on both Docker and Windows builds.
 

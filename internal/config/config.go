@@ -19,6 +19,7 @@ type Camera struct {
 	Username      string `yaml:"username"`
 	Password      string `yaml:"password"`
 	Device        string `yaml:"device,omitempty"`
+	LocalBackend  string `yaml:"local_backend,omitempty"`  // native|ffmpeg
 	Path          string `yaml:"path,omitempty"`           // explicit RTSP path (e.g., /Bfy... from UniFi Protect)
 	RTSPTransport string `yaml:"rtsp_transport,omitempty"` // tcp|udp
 	Stream        string `yaml:"stream,omitempty"`         // stream1|stream2

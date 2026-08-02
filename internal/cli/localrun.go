@@ -27,11 +27,53 @@ type localCaptureRequest struct {
 	duration  time.Duration
 	threshold float64
 	onLine    func(string)
+	notice    func(...any)
 }
 
-// runLocalCapture is the single execution seam for local camera captures. A
-// future native backend can replace this dispatcher without changing commands.
+const cameraPermissionRemediation = "Grant Camera access in System Settings → Privacy & Security → Camera. For terminal launches, grant access to the launching terminal. Over SSH there is no permission prompt; run `tccutil reset Camera` locally to re-prompt."
+
+// runLocalCapture is the single execution seam for local camera captures.
 func runLocalCapture(ctx context.Context, request localCaptureRequest) error {
+	backend := request.options.LocalBackend
+	if backend == "" {
+		backend = defaultLocalBackend()
+	}
+	if backend != capture.LocalBackendNative && backend != capture.LocalBackendFFmpeg {
+		return fmt.Errorf("invalid local backend %q (use native|ffmpeg)", backend)
+	}
+	if backend == capture.LocalBackendNative && !nativeLocalBackendAvailable() {
+		return fmt.Errorf("native local capture backend is not available in this build; use --local-backend ffmpeg")
+	}
+
+	if request.operation == localSnap && backend == capture.LocalBackendNative {
+		if err := preflightNativeCamera(ctx, true, request.notice); err != nil {
+			return err
+		}
+		fallbackDevice, err := nativeCaptureFrame(request.options.Device, request.options.Warmup, request.output)
+		if err == nil {
+			return nil
+		}
+		if isNativePermissionError(err) {
+			return fmt.Errorf("native local capture failed: %w\n%s", err, cameraPermissionRemediation)
+		}
+		if !isNativeSessionFailure(err) || !mediaexec.HasBinary("ffmpeg") {
+			return fmt.Errorf("native local capture failed: %w", err)
+		}
+		if request.notice != nil {
+			request.notice(fmt.Sprintf("Native AVFoundation capture failed (%v); falling back to ffmpeg.", err))
+		}
+		request.options.Device = fallbackDevice
+	}
+
+	if request.operation != localSnap {
+		if err := failIfNativeCameraDenied(); err != nil {
+			return err
+		}
+	}
+	return runLocalFFmpeg(ctx, request)
+}
+
+func runLocalFFmpeg(ctx context.Context, request localCaptureRequest) error {
 	var (
 		args []string
 		err  error
@@ -86,9 +128,66 @@ func localCaptureFailure(err error, output string) error {
 		details += "\n" + modes
 	}
 	if class == "permission" {
-		details += "\nGrant Camera access to the launching terminal in System Settings → Privacy & Security → Camera. Over SSH there is no permission prompt; run `tccutil reset Camera` locally to re-prompt."
+		details += "\n" + cameraPermissionRemediation
 	}
 	return fmt.Errorf("local capture failed (%s): %w%s", class, err, details)
+}
+
+func preflightNativeCamera(ctx context.Context, requestAccess bool, notice func(...any)) error {
+	status, err := nativeCameraAuthorizationStatus()
+	if err != nil {
+		return err
+	}
+	switch status {
+	case "authorized":
+		return nil
+	case "notDetermined":
+		if !requestAccess {
+			return nil
+		}
+		if notice != nil {
+			notice("A macOS Camera permission dialog may have appeared; waiting for your response.")
+		}
+		granted, requestErr := nativeRequestCameraAccess(ctx)
+		if requestErr != nil {
+			return fmt.Errorf("request camera access: %w", requestErr)
+		}
+		if granted {
+			return nil
+		}
+		return fmt.Errorf("camera access was not granted\n%s", cameraPermissionRemediation)
+	case "denied", "restricted":
+		return fmt.Errorf("camera access is %s\n%s", status, cameraPermissionRemediation)
+	default:
+		return fmt.Errorf("camera authorization status is %s", status)
+	}
+}
+
+func failIfNativeCameraDenied() error {
+	if !nativeLocalBackendAvailable() {
+		return nil
+	}
+	status, err := nativeCameraAuthorizationStatus()
+	if err != nil {
+		return nil
+	}
+	if status == "denied" || status == "restricted" {
+		return fmt.Errorf("camera access is %s\n%s", status, cameraPermissionRemediation)
+	}
+	return nil
+}
+
+func isNativePermissionError(err error) bool {
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "camera access") || strings.Contains(message, "not permitted") || strings.Contains(message, "permission")
+}
+
+func isNativeSessionFailure(err error) bool {
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "create device input") ||
+		strings.Contains(message, "capture session") ||
+		strings.Contains(message, "timed out waiting for a video frame") ||
+		strings.Contains(message, "capture frame:")
 }
 
 func supportedModeText(output string) string {

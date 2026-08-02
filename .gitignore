@@ -11,6 +11,8 @@ coverage.*
 
 # Build artifacts
 cmd/**/dist/
+/camsnap
+/dist/
 
 # macOS
 .DS_Store

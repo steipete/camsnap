@@ -18,6 +18,29 @@ builds:
       - linux_arm64
       - windows_amd64
       - windows_arm64
+    overrides:
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CGO_ENABLED=1
+          - CC=clang
+          - CGO_CFLAGS=-arch arm64
+          - CGO_LDFLAGS=-arch arm64
+        ldflags:
+          - '-linkmode external -extldflags "-Wl,-sectcreate,__TEXT,__info_plist,{{ .Env.PWD }}/internal/avf/Info.plist"'
+      - goos: darwin
+        goarch: amd64
+        env:
+          - CGO_ENABLED=1
+          - CC=clang
+          - CGO_CFLAGS=-arch x86_64
+          - CGO_LDFLAGS=-arch x86_64
+        ldflags:
+          - '-linkmode external -extldflags "-Wl,-sectcreate,__TEXT,__info_plist,{{ .Env.PWD }}/internal/avf/Info.plist"'
+    hooks:
+      post:
+        - cmd: './scripts/sign-darwin.sh "{{ .Path }}"'
+          output: true
 
 archives:
   - ids:
