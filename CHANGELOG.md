@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2026-08-02
 - Show native webcam indices in the `devices` table alongside stable IDs, names, and default status.
 - Validate native webcam selectors before requesting macOS Camera permission.
 - Match native webcam names case-insensitively and report available or ambiguous matches.
