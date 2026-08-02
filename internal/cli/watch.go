@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	osexec "os/exec"
+	gort "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -25,17 +26,14 @@ func newWatchCmd() *cobra.Command {
 	var transport string
 	var stream string
 	var path string
+	var device string
+	var framerate int
+	var videoSize string
 
 	cmd := &cobra.Command{
 		Use:   "watch",
 		Short: "Run motion detection and execute an action",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if cameraName == "" && len(args) > 0 {
-				cameraName = args[0]
-			}
-			if cameraName == "" {
-				return fmt.Errorf("--camera is required")
-			}
 			if action == "" {
 				return fmt.Errorf("--action is required (e.g., \"say motion\" or \"touch /tmp/motion\")")
 			}
@@ -45,28 +43,27 @@ func newWatchCmd() *cobra.Command {
 			if !mediaexec.HasBinary("ffmpeg") {
 				return fmt.Errorf("ffmpeg not found in PATH")
 			}
-			cfgFlag, err := configPathFlag(cmd)
+			cam, selectedName, err := selectCaptureCamera(cmd, args, cameraName, device)
 			if err != nil {
 				return err
 			}
-			cfg, _, err := loadConfig(cfgFlag)
-			if err != nil {
-				return err
-			}
-			cam, ok := findCamera(cfg, cameraName)
-			if !ok {
-				return fmt.Errorf("camera %q not found", cameraName)
-			}
-			if _, ok := parseRTSPAuth(authMode); !ok {
-				return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
-			}
+			cameraName = selectedName
 			options, err := capture.Resolve(cam, (captureFlagValues{
 				transport: transport,
 				stream:    stream,
 				path:      path,
+				rtspAuth:  authMode,
+				device:    device,
+				framerate: framerate,
+				videoSize: videoSize,
 			}).overrides(cmd))
 			if err != nil {
 				return err
+			}
+			if options.Kind == capture.KindRTSP {
+				if _, ok := parseRTSPAuth(authMode); !ok {
+					return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
+				}
 			}
 			if tmpl != "" {
 				action, err = applyTemplate(tmpl, cam.Name, 0, time.Now())
@@ -82,8 +79,15 @@ func newWatchCmd() *cobra.Command {
 				defer cancel()
 			}
 
-			ffArgs := capture.WatchArgs(options, threshold)
-			return watchMotion(ctx, cameraName, ffArgs, cooldown, action, tmpl, jsonOutput, cmd)
+			onLine := motionLineHandler(ctx, cameraName, cooldown, action, tmpl, jsonOutput, cmd)
+			if options.Kind == capture.KindLocal {
+				return runLocalCapture(ctx, localCaptureRequest{operation: localWatch, options: options, threshold: threshold, onLine: onLine})
+			}
+			ffArgs, err := capture.WatchArgs(options, threshold, gort.GOOS)
+			if err != nil {
+				return err
+			}
+			return watchMotion(ctx, ffArgs, onLine)
 		},
 	}
 
@@ -98,13 +102,28 @@ func newWatchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&transport, "rtsp-transport", "tcp", "RTSP transport: tcp|udp")
 	cmd.Flags().StringVar(&stream, "stream", "", "RTSP path segment (stream1 or stream2); ignored if --path is set")
 	cmd.Flags().StringVar(&path, "path", "", "Custom RTSP path (overrides --stream), e.g., /Bfy... from UniFi Protect")
+	cmd.Flags().StringVar(&device, "device", "", "Local video device index, name, or /dev/videoN path")
+	cmd.Flags().IntVar(&framerate, "framerate", 30, "Local capture framerate")
+	cmd.Flags().StringVar(&videoSize, "video-size", "", "Local capture size (e.g., 1280x720)")
 
 	return cmd
 }
 
-func watchMotion(ctx context.Context, cameraName string, ffArgs []string, cooldown time.Duration, action string, tmpl string, jsonOutput bool, cmd *cobra.Command) error {
+func watchMotion(ctx context.Context, ffArgs []string, onLine func(string)) error {
+	logTail, exitErr, err := mediaexec.RunFFmpegWithStderrLines(ctx, ffArgs, onLine)
+	if err != nil {
+		return err
+	}
+	if exitErr != nil && ctx.Err() == nil {
+		class := mediaexec.ClassifyError(logTail)
+		return fmt.Errorf("ffmpeg exited: %w (%s)", exitErr, class)
+	}
+	return nil
+}
+
+func motionLineHandler(ctx context.Context, cameraName string, cooldown time.Duration, action string, tmpl string, jsonOutput bool, cmd *cobra.Command) func(string) {
 	lastTrigger := time.Time{}
-	logTail, exitErr, err := mediaexec.RunFFmpegWithStderrLines(ctx, ffArgs, func(line string) {
+	return func(line string) {
 		if score, ok := parseSceneScore(line); ok {
 			now := time.Now()
 			if lastTrigger.IsZero() || now.Sub(lastTrigger) >= cooldown {
@@ -123,15 +142,7 @@ func watchMotion(ctx context.Context, cameraName string, ffArgs []string, cooldo
 				runAction(ctx, act, score, now, cameraName)
 			}
 		}
-	})
-	if err != nil {
-		return err
 	}
-	if exitErr != nil && ctx.Err() == nil {
-		class := mediaexec.ClassifyError(logTail)
-		return fmt.Errorf("ffmpeg exited: %w (%s)", exitErr, class)
-	}
-	return nil
 }
 
 func parseSceneScore(line string) (float64, bool) {

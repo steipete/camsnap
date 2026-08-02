@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/steipete/camsnap/internal/capture"
@@ -42,8 +43,13 @@ type captureFlagValues struct {
 	stream     string
 	client     string
 	path       string
+	rtspAuth   string
 	noAudio    bool
 	audioCodec string
+	device     string
+	framerate  int
+	videoSize  string
+	warmup     time.Duration
 }
 
 func (values captureFlagValues) overrides(cmd *cobra.Command) capture.Overrides {
@@ -52,9 +58,28 @@ func (values captureFlagValues) overrides(cmd *cobra.Command) capture.Overrides 
 		Stream:     changedString(cmd, "stream", values.stream),
 		Client:     changedString(cmd, "rtsp-client", values.client),
 		Path:       changedString(cmd, "path", values.path),
+		RTSPAuth:   changedString(cmd, "rtsp-auth", values.rtspAuth),
 		NoAudio:    changedBool(cmd, "no-audio", values.noAudio),
 		AudioCodec: changedString(cmd, "audio-codec", values.audioCodec),
+		Device:     changedString(cmd, "device", values.device),
+		Framerate:  changedInt(cmd, "framerate", values.framerate),
+		VideoSize:  changedString(cmd, "video-size", values.videoSize),
+		Warmup:     changedDuration(cmd, "warmup", values.warmup),
 	}
+}
+
+func changedInt(cmd *cobra.Command, name string, value int) *int {
+	if cmd.Flags().Changed(name) {
+		return &value
+	}
+	return nil
+}
+
+func changedDuration(cmd *cobra.Command, name string, value time.Duration) *time.Duration {
+	if cmd.Flags().Changed(name) {
+		return &value
+	}
+	return nil
 }
 
 func changedString(cmd *cobra.Command, name, value string) *string {
@@ -82,4 +107,29 @@ func loadConfigFromFlag(cmd *cobra.Command) (config.Config, string, error) {
 		return config.Config{}, "", err
 	}
 	return cfg, path, nil
+}
+
+func selectCaptureCamera(cmd *cobra.Command, args []string, cameraName, device string) (config.Camera, string, error) {
+	if cameraName == "" && len(args) > 0 {
+		cameraName = args[0]
+	}
+	if cameraName != "" && device != "" {
+		return config.Camera{}, "", fmt.Errorf("camera name and --device are mutually exclusive")
+	}
+	if cameraName == "" && device == "" {
+		return config.Camera{}, "", fmt.Errorf("--camera or --device is required")
+	}
+	if device != "" {
+		return config.Camera{Name: device, Protocol: "local", Device: device}, device, nil
+	}
+
+	cfg, _, err := loadConfigFromFlag(cmd)
+	if err != nil {
+		return config.Camera{}, "", err
+	}
+	cam, ok := findCamera(cfg, cameraName)
+	if !ok {
+		return config.Camera{}, "", fmt.Errorf("camera %q not found", cameraName)
+	}
+	return cam, cameraName, nil
 }

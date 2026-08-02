@@ -25,6 +25,11 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 				NoAudio:       true,
 				AudioCodec:    "aac",
 			},
+			{
+				Name:     "laptop",
+				Protocol: "local",
+				Device:   "0",
+			},
 		},
 	}
 
@@ -37,11 +42,14 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	if len(loaded.Cameras) != 1 || loaded.Cameras[0].Name != "front" {
+	if len(loaded.Cameras) != 2 || loaded.Cameras[0].Name != "front" {
 		t.Fatalf("round trip mismatch: %#v", loaded)
 	}
 	if loaded.Cameras[0].RTSPTransport != "udp" || loaded.Cameras[0].Stream != "stream2" || loaded.Cameras[0].RTSPClient != "gortsplib" || !loaded.Cameras[0].NoAudio || loaded.Cameras[0].AudioCodec != "aac" {
 		t.Fatalf("round trip custom fields mismatch: %#v", loaded.Cameras[0])
+	}
+	if loaded.Cameras[1].Protocol != "local" || loaded.Cameras[1].Device != "0" {
+		t.Fatalf("round trip local device mismatch: %#v", loaded.Cameras[1])
 	}
 }
 

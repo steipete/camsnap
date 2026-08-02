@@ -1,0 +1,7 @@
+ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers
+[AVFoundation indev @ 0x71ac18140] AVFoundation video devices:
+[AVFoundation indev @ 0x71ac18140] [0] Capture screen 0
+[AVFoundation indev @ 0x71ac18140] AVFoundation audio devices:
+[AVFoundation indev @ 0x71ac18140] [0] BlackHole 2ch
+[AVFoundation indev @ 0x71ac18140] [1] Jump Desktop Microphone
+[in#0 @ 0x71ac18000] Error opening input: Input/output error

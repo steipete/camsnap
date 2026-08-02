@@ -101,17 +101,21 @@ func HasBinary(name string) bool {
 	return err == nil
 }
 
-// ClassifyError inspects ffmpeg stderr to differentiate auth vs network errors.
+// ClassifyError inspects ffmpeg stderr to differentiate common failures.
 func ClassifyError(stderr string) string {
 	lower := strings.ToLower(stderr)
 	switch {
+	case strings.Contains(lower, "operation not permitted") ||
+		strings.Contains(lower, "failed to create avcapturedeviceinput") ||
+		strings.Contains(lower, "not authorized to capture video"):
+		return "permission"
 	case strings.Contains(lower, "401") || strings.Contains(lower, "unauthorized") || strings.Contains(lower, "auth"):
 		return "auth"
 	case strings.Contains(lower, "connection refused"):
 		return "network-refused"
 	case strings.Contains(lower, "timed out") || strings.Contains(lower, "timeout"):
 		return "network-timeout"
-	case strings.Contains(lower, "not found"):
+	case strings.Contains(lower, "not found") || strings.Contains(lower, "no such file or directory") || strings.Contains(lower, "could not find video device"):
 		return "not-found"
 	default:
 		return "unknown"

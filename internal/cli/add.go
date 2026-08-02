@@ -3,6 +3,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/steipete/camsnap/internal/config"
@@ -15,14 +16,33 @@ func newAddCmd() *cobra.Command {
 		Use:   "add",
 		Short: "Add or update a camera",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if cam.Name == "" || cam.Host == "" {
-				return fmt.Errorf("name and host are required")
+			cam.Protocol = strings.ToLower(cam.Protocol)
+			if cam.Name == "" {
+				return fmt.Errorf("name is required")
 			}
-			if cam.Port == 0 {
-				cam.Port = 554
-			}
-			if cam.Protocol == "" {
-				cam.Protocol = "rtsp"
+			switch cam.Protocol {
+			case "local":
+				if cam.Device == "" {
+					return fmt.Errorf("--device is required for protocol local")
+				}
+				for _, flag := range []string{"host", "port", "user", "pass", "path", "rtsp-transport", "stream", "rtsp-client", "no-audio", "audio-codec"} {
+					if cmd.Flags().Changed(flag) {
+						return fmt.Errorf("--%s is not valid for protocol local", flag)
+					}
+				}
+				cam.Port = 0
+			case "rtsp", "rtsps":
+				if cam.Host == "" {
+					return fmt.Errorf("name and host are required")
+				}
+				if cmd.Flags().Changed("device") {
+					return fmt.Errorf("--device is only valid for protocol local")
+				}
+				if cam.Port == 0 {
+					cam.Port = 554
+				}
+			default:
+				return fmt.Errorf("invalid --protocol (use rtsp|rtsps|local)")
 			}
 
 			cfgFlag, err := configPathFlag(cmd)
@@ -49,9 +69,10 @@ func newAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cam.Name, "name", "", "Camera name (unique)")
 	cmd.Flags().StringVar(&cam.Host, "host", "", "Camera host or IP")
 	cmd.Flags().IntVar(&cam.Port, "port", 554, "Camera port (default 554)")
-	cmd.Flags().StringVar(&cam.Protocol, "protocol", "rtsp", "Protocol (rtsp or rtsps)")
+	cmd.Flags().StringVar(&cam.Protocol, "protocol", "rtsp", "Protocol (rtsp, rtsps, or local)")
 	cmd.Flags().StringVar(&cam.Username, "user", "", "Camera username")
 	cmd.Flags().StringVar(&cam.Password, "pass", "", "Camera password")
+	cmd.Flags().StringVar(&cam.Device, "device", "", "Local video device index, name, or /dev/videoN path")
 	cmd.Flags().StringVar(&cam.Path, "path", "", "Explicit RTSP path (e.g., /Bfy... token from UniFi Protect)")
 	cmd.Flags().StringVar(&cam.RTSPTransport, "rtsp-transport", "", "Preferred RTSP transport for this camera (tcp|udp)")
 	cmd.Flags().StringVar(&cam.Stream, "stream", "", "Default RTSP stream path (stream1 or stream2)")

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -31,6 +32,98 @@ func TestAddAndList(t *testing.T) {
 	}
 	if !bytes.Contains(buf.Bytes(), []byte("t1")) {
 		t.Fatalf("expected camera name in list output, got: %s", buf.String())
+	}
+}
+
+func TestAddLocalCameraAndList(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfgPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "camsnap", "config.yaml")
+
+	root := NewRootCommand("test")
+	root.SetArgs([]string{"--config", cfgPath, "add", "--name", "mbp", "--protocol", "local", "--device", "0"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("add local execute: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if len(cfg.Cameras) != 1 || cfg.Cameras[0].Protocol != "local" || cfg.Cameras[0].Device != "0" || cfg.Cameras[0].Host != "" {
+		t.Fatalf("local camera config = %#v", cfg.Cameras)
+	}
+
+	var output bytes.Buffer
+	root = NewRootCommand("test")
+	root.SetOut(&output)
+	root.SetArgs([]string{"--config", cfgPath, "list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("list local execute: %v", err)
+	}
+	if !strings.Contains(output.String(), "device=0 proto=local") {
+		t.Fatalf("local list output = %q", output.String())
+	}
+}
+
+func TestAddLocalCameraValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "device required", args: []string{"add", "--name", "mbp", "--protocol", "local"}, want: "--device is required"},
+		{name: "host rejected", args: []string{"add", "--name", "mbp", "--protocol", "local", "--device", "0", "--host", "localhost"}, want: "--host is not valid"},
+		{name: "RTSP flag rejected", args: []string{"add", "--name", "mbp", "--protocol", "local", "--device", "0", "--rtsp-transport", "udp"}, want: "--rtsp-transport is not valid"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			root := NewRootCommand("test")
+			root.SetArgs(tt.args)
+			err := root.Execute()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Execute error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestSnapAdHocLocalDevice(t *testing.T) {
+	ffmpegPath, argsPath := makeRecordingStubFFmpeg(t)
+	t.Setenv("PATH", ffmpegPath)
+	output := filepath.Join(t.TempDir(), "snap.jpg")
+
+	root := NewRootCommand("test")
+	root.SetArgs([]string{"snap", "--device", "0", "--framerate", "24", "--video-size", "1280x720", "--warmup", "1500ms", "--out", output})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("snap local: %v", err)
+	}
+	args := readRecordedArgs(t, argsPath)
+	inputFormat := "avfoundation"
+	if runtime.GOOS == "linux" {
+		inputFormat = "v4l2"
+	}
+	assertArgsContainSequence(t, args, "-f", inputFormat, "-framerate", "24", "-video_size", "1280x720", "-i", "0")
+	assertArgsContainSequence(t, args, "-t", "1.5", "-update", "1", "-q:v", "2", output)
+}
+
+func TestCaptureCameraAndDeviceAreMutuallyExclusive(t *testing.T) {
+	t.Setenv("PATH", makeStubFFmpeg(t))
+	root := NewRootCommand("test")
+	root.SetArgs([]string{"snap", "saved", "--device", "0", "--out", filepath.Join(t.TempDir(), "snap.jpg")})
+	err := root.Execute()
+	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("Execute error = %v", err)
+	}
+}
+
+func TestLocalCaptureRejectsExplicitRTSPFlags(t *testing.T) {
+	t.Setenv("PATH", makeStubFFmpeg(t))
+	root := NewRootCommand("test")
+	root.SetArgs([]string{"snap", "--device", "0", "--rtsp-transport", "udp", "--out", filepath.Join(t.TempDir(), "snap.jpg")})
+	err := root.Execute()
+	if err == nil || !strings.Contains(err.Error(), "RTSP and audio flags") {
+		t.Fatalf("Execute error = %v", err)
 	}
 }
 

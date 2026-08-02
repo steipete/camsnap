@@ -1,8 +1,8 @@
-# 📸 camsnap — One command to grab frames, clips, or motion alerts from your cams (RTSP/ONVIF).
+# 📸 camsnap — One command to grab frames, clips, or motion alerts from RTSP/ONVIF cameras and local webcams.
 
 ## Install / Run
 - Homebrew (installs `ffmpeg` automatically): `brew install steipete/tap/camsnap`
-- Requirements for source run: Go 1.26+ and `ffmpeg` on PATH.
+- Requirements for source run: Go 1.26+ and `ffmpeg` on PATH. Local webcams use AVFoundation on macOS and v4l2 on Linux; Windows is not supported.
 - Run in-place: `go run ./cmd/camsnap --help`
 - Run in Docker: `docker run --rm ghcr.io/steipete/camsnap --help`  
   Mount volumes for persistent config and output:
@@ -65,6 +65,31 @@ go run ./cmd/camsnap discover --info
 go run ./cmd/camsnap doctor --probe --rtsp-transport udp
 ```
 
+## Local webcams
+
+List the local video inputs that ffmpeg can see, then either save one in the camera config or use it ad hoc. On macOS the device can be an AVFoundation index or name; on Linux use a `/dev/videoN` path.
+
+```sh
+camsnap devices
+camsnap devices --json
+
+# Save a macOS camera, then use the same snap/clip/watch commands as RTSP cameras.
+camsnap add --name mbp --protocol local --device 0
+camsnap snap mbp --out shot.jpg
+camsnap clip mbp --dur 5s --out clip.mp4
+camsnap watch mbp --threshold 0.2 --action 'touch /tmp/motion'
+
+# Or capture without adding a camera first.
+camsnap snap --device 0 --framerate 30 --video-size 1280x720 --warmup 1s --out shot.jpg
+camsnap clip --device /dev/video0 --dur 5s --out clip.mp4
+```
+
+Local snapshots warm up the camera before keeping the final JPEG so auto-exposure can settle. Local clips are video-only for now: camsnap encodes H.264 and does not request microphone access.
+
+On macOS, Camera permission belongs to the terminal or application that launches camsnap—not to the `camsnap` binary itself. Grant that launcher access in **System Settings → Privacy & Security → Camera**. An SSH session cannot display the macOS permission prompt; if access was previously denied, run `tccutil reset Camera` locally and retry from the launching terminal. Continuity Camera is listed only while the iPhone is nearby and unlocked.
+
+Direct local-device capture is not supported from the camsnap Docker image. Windows local webcams are also unsupported; RTSP cameras continue to work on both Docker and Windows builds.
+
 ## Tapo specifics
 - Enable “Third‑Party NVR/RTSP” and set a per‑camera account; disable Privacy Mode.
 - TC70 often needs `udp` + `stream2` + `gortsplib` and may require disabling Tapo Care/SD recording to free RTSP streams.
@@ -73,7 +98,7 @@ go run ./cmd/camsnap doctor --probe --rtsp-transport udp
 
 ## Behavior notes
 - Motion uses ffmpeg scene-change detection; actions can log JSON (`--json`).
-- Doctor classifies ffmpeg probe errors (auth vs network).
+- Doctor classifies ffmpeg probe errors (auth, network, local-device, and macOS Camera permission failures).
 - Per-camera defaults reduce flag noise for devices with quirks.
 
 ## Roadmap
