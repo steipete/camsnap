@@ -67,7 +67,7 @@ go run ./cmd/camsnap doctor --probe --rtsp-transport udp
 
 ## Local webcams
 
-List local video inputs, then either save one in the camera config or use it ad hoc. Official macOS builds use native AVFoundation for this command and for snapshots; a macOS device can be its unique ID, exact name, or the integer index implied by the listed order. When saving a macOS camera, prefer its AVFoundation unique ID (or exact name): numeric indices can differ between the native and ffmpeg backends and can change when hardware is attached or removed. Reserve indices for convenient one-off captures. Linux and macOS builds without cgo use ffmpeg-backed enumeration; on Linux use a `/dev/videoN` path.
+List local video inputs, then either save one in the camera config or use it ad hoc. Official macOS builds use native AVFoundation for this command and for snapshots; the native table shows `INDEX`, `ID`, `NAME`, and `DEFAULT`. A macOS device can be its unique ID, case-insensitive name, or listed integer index. When saving a macOS camera, prefer its AVFoundation unique ID (or name): numeric indices can differ between the native and ffmpeg backends and can change when hardware is attached or removed. Reserve indices for convenient one-off captures. Linux and macOS builds without cgo use ffmpeg-backed enumeration; on Linux use a `/dev/videoN` path.
 
 ```sh
 camsnap devices
@@ -80,14 +80,15 @@ camsnap clip mbp --dur 5s --out clip.mp4
 camsnap watch mbp --threshold 0.2 --action 'touch /tmp/motion'
 
 # Or capture without adding a camera first.
+camsnap snap --out default-camera.jpg
 camsnap snap --device 0 --framerate 30 --video-size 1280x720 --warmup 1s --out shot.jpg
 camsnap snap --device 0 --local-backend ffmpeg --out ffmpeg-shot.jpg
 camsnap clip --device /dev/video0 --dur 5s --out clip.mp4
 ```
 
-`--local-backend native|ffmpeg` mirrors the per-camera `local_backend` setting. Native is the default when compiled into a cgo-enabled macOS build; ffmpeg is the default elsewhere and is always used for clip/watch. Selecting `native` in a build where it is unavailable returns an error. Local snapshots warm up the camera before keeping the final JPEG so auto-exposure can settle. Local clips are video-only for now: camsnap encodes H.264 and does not request microphone access.
+`--local-backend native|ffmpeg` mirrors the per-camera `local_backend` setting. Native is the default when compiled into a cgo-enabled macOS build; ffmpeg is the default elsewhere and is always used for clip/watch. In a native macOS build, bare `camsnap snap` uses the device marked `DEFAULT`; clip and watch still require a camera or device, and bare snap does not guess when the ffmpeg backend is selected. Selecting `native` in a build where it is unavailable returns an error. Local snapshots warm up the camera before keeping the final JPEG so auto-exposure can settle. Local clips are video-only for now: camsnap encodes H.264 and does not request microphone access.
 
-On macOS, the signed native build performs the Camera permission request itself. TCC still follows responsible-process rules: a terminal launch normally attributes Camera access to Terminal, iTerm, or the other launching terminal, while a signed camsnap binary launched directly from launchd or a script is attributed to camsnap. Grant the entry macOS shows in **System Settings → Privacy & Security → Camera**. An SSH session cannot display the permission prompt; if access was previously denied, run `tccutil reset Camera` locally and retry from a local launch. Continuity Camera is listed only while the iPhone is nearby and unlocked.
+On macOS, the signed native build performs the Camera permission request itself. Device selectors are validated first, so an invalid `--device` fails with the available choices before any permission prompt. TCC still follows responsible-process rules: a terminal launch normally attributes Camera access to Terminal, iTerm, or the other launching terminal, while a signed camsnap binary launched directly from launchd or a script is attributed to camsnap. Grant the entry macOS shows in **System Settings → Privacy & Security → Camera**. An SSH session cannot display the permission prompt; if access was previously denied, run `tccutil reset Camera` locally and retry from a local launch. Continuity Camera is listed only while the iPhone is nearby and unlocked.
 
 Use `make build` for a local macOS binary with the required embedded usage-description plist and an ad-hoc signature. Set `CAMSNAP_CODESIGN_IDENTITY` to use a local Developer ID identity instead. The official release artifacts carry the same plist and are signed in the release workflow.
 

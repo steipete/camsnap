@@ -126,6 +126,12 @@ func loadConfigFromFlag(cmd *cobra.Command) (config.Config, string, error) {
 }
 
 func selectCaptureCamera(cmd *cobra.Command, args []string, cameraName, device string) (config.Camera, string, error) {
+	return selectCaptureCameraWithDefault(cmd, args, cameraName, device, false)
+}
+
+var nativeDefaultCamera = findNativeDefaultCamera
+
+func selectCaptureCameraWithDefault(cmd *cobra.Command, args []string, cameraName, device string, useNativeDefault bool) (config.Camera, string, error) {
 	if cameraName == "" && len(args) > 0 {
 		cameraName = args[0]
 	}
@@ -133,6 +139,16 @@ func selectCaptureCamera(cmd *cobra.Command, args []string, cameraName, device s
 		return config.Camera{}, "", fmt.Errorf("camera name and --device are mutually exclusive")
 	}
 	if cameraName == "" && device == "" {
+		if useNativeDefault {
+			defaultDevice, ok, err := nativeDefaultCamera()
+			if err != nil {
+				return config.Camera{}, "", err
+			}
+			if ok {
+				cmd.PrintErrln(fmt.Sprintf("No camera specified; using default camera %q", defaultDevice.Name))
+				return config.Camera{Name: defaultDevice.Name, Protocol: "local", Device: defaultDevice.ID}, defaultDevice.Name, nil
+			}
+		}
 		return config.Camera{}, "", fmt.Errorf("--camera or --device is required")
 	}
 	if device != "" {
@@ -148,4 +164,16 @@ func selectCaptureCamera(cmd *cobra.Command, args []string, cameraName, device s
 		return config.Camera{}, "", fmt.Errorf("camera %q not found", cameraName)
 	}
 	return cam, cameraName, nil
+}
+
+func findNativeDefaultCamera() (localDevice, bool, error) {
+	if !nativeLocalBackendAvailable() {
+		return localDevice{}, false, nil
+	}
+	devices, err := nativeEnumerateLocalDevices()
+	if err != nil {
+		return localDevice{}, false, fmt.Errorf("enumerate native cameras: %w", err)
+	}
+	device, ok := defaultNativeDevice(devices)
+	return device, ok, nil
 }

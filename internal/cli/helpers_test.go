@@ -1,8 +1,12 @@
 package cli
 
 import (
+	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/steipete/camsnap/internal/config"
 	"github.com/steipete/camsnap/internal/rtsp"
 )
@@ -83,5 +87,57 @@ func TestCustomPathOverrideIsNotDuplicated(t *testing.T) {
 	want := "rtsp://192.168.1.10:554/av_stream/ch0"
 	if got != want {
 		t.Fatalf("custom path duplicated: got %s want %s", got, want)
+	}
+}
+
+func TestSelectCaptureCameraUsesNativeDefault(t *testing.T) {
+	previous := nativeDefaultCamera
+	nativeDefaultCamera = func() (localDevice, bool, error) {
+		return localDevice{ID: "default-id", Name: "Default Camera", IsDefault: true}, true, nil
+	}
+	defer func() { nativeDefaultCamera = previous }()
+
+	cmd := &cobra.Command{}
+	var stderr bytes.Buffer
+	cmd.SetErr(&stderr)
+	cam, selectedName, err := selectCaptureCameraWithDefault(cmd, nil, "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cam.Protocol != "local" || cam.Device != "default-id" || cam.Name != "Default Camera" {
+		t.Fatalf("selected camera = %#v", cam)
+	}
+	if selectedName != "Default Camera" {
+		t.Fatalf("selected name = %q", selectedName)
+	}
+	if got := stderr.String(); !strings.Contains(got, `No camera specified; using default camera "Default Camera"`) {
+		t.Fatalf("stderr = %q", got)
+	}
+}
+
+func TestSelectCaptureCameraKeepsDeviceRequiredWithoutDefault(t *testing.T) {
+	previous := nativeDefaultCamera
+	nativeDefaultCamera = func() (localDevice, bool, error) { return localDevice{}, false, nil }
+	defer func() { nativeDefaultCamera = previous }()
+
+	cmd := &cobra.Command{}
+	for _, useNativeDefault := range []bool{false, true} {
+		if _, _, err := selectCaptureCameraWithDefault(cmd, nil, "", "", useNativeDefault); err == nil || err.Error() != "--camera or --device is required" {
+			t.Fatalf("useNativeDefault=%t error = %v", useNativeDefault, err)
+		}
+	}
+}
+
+func TestSelectCaptureCameraPropagatesEnumerationError(t *testing.T) {
+	previous := nativeDefaultCamera
+	nativeDefaultCamera = func() (localDevice, bool, error) {
+		return localDevice{}, false, fmt.Errorf("enumerate native cameras: bridge failure")
+	}
+	defer func() { nativeDefaultCamera = previous }()
+
+	cmd := &cobra.Command{}
+	_, _, err := selectCaptureCameraWithDefault(cmd, nil, "", "", true)
+	if err == nil || !strings.Contains(err.Error(), "enumerate native cameras") {
+		t.Fatalf("error = %v", err)
 	}
 }

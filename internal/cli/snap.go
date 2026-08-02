@@ -31,8 +31,10 @@ func newSnapCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "snap",
 		Short: "Capture a single frame to a file",
+		Long:  "Capture a single frame to a file. In native macOS builds, omitting both the camera name and --device uses the default local camera.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cam, selectedName, err := selectCaptureCamera(cmd, args, cameraName, device)
+			useNativeDefault := localBackend != capture.LocalBackendFFmpeg
+			cam, selectedName, err := selectCaptureCameraWithDefault(cmd, args, cameraName, device, useNativeDefault)
 			if err != nil {
 				return err
 			}

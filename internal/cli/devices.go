@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -36,7 +38,7 @@ func newDevicesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "devices",
 		Short: "List local video capture devices",
-		Long:  "List local video capture devices. On macOS, save cameras by AVFoundation unique ID or exact name; numeric indices can differ between backends and change with attached hardware.",
+		Long:  "List local video capture devices. On macOS, save cameras by AVFoundation unique ID or name; numeric indices can differ between backends and change with attached hardware.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			backend := capture.LocalBackendFFmpeg
 			authorizationStatus := ""
@@ -72,23 +74,27 @@ func newDevicesCmd() *cobra.Command {
 				}
 				return nil
 			}
-			writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
-			if backend == capture.LocalBackendNative {
-				_, _ = fmt.Fprintln(writer, "ID\tNAME\tDEFAULT")
-				for _, device := range devices {
-					_, _ = fmt.Fprintf(writer, "%s\t%s\t%t\n", device.ID, device.Name, device.IsDefault)
-				}
-			} else {
-				_, _ = fmt.Fprintln(writer, "INDEX\tNAME")
-				for _, device := range devices {
-					_, _ = fmt.Fprintf(writer, "%s\t%s\n", device.Index, device.Name)
-				}
-			}
-			return writer.Flush()
+			return writeLocalDevicesTable(cmd.OutOrStdout(), backend, devices)
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Print devices as JSON")
 	return cmd
+}
+
+func writeLocalDevicesTable(output io.Writer, backend string, devices []localDevice) error {
+	writer := tabwriter.NewWriter(output, 0, 4, 2, ' ', 0)
+	if backend == capture.LocalBackendNative {
+		_, _ = fmt.Fprintln(writer, "INDEX\tID\tNAME\tDEFAULT")
+		for _, device := range devices {
+			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\t%t\n", device.Index, device.ID, device.Name, device.IsDefault)
+		}
+	} else {
+		_, _ = fmt.Fprintln(writer, "INDEX\tNAME")
+		for _, device := range devices {
+			_, _ = fmt.Fprintf(writer, "%s\t%s\n", device.Index, device.Name)
+		}
+	}
+	return writer.Flush()
 }
 
 func enumerateLocalDevices(goos string) ([]localDevice, error) {
@@ -138,7 +144,21 @@ func parseAVFoundationDevices(stderr string) []localDevice {
 			devices = append(devices, localDevice{Index: matches[1], Name: strings.TrimSpace(matches[2])})
 		}
 	}
-	sort.Slice(devices, func(i, j int) bool { return devices[i].Index < devices[j].Index })
+	numericIndices := true
+	for _, device := range devices {
+		if _, err := strconv.Atoi(device.Index); err != nil {
+			numericIndices = false
+			break
+		}
+	}
+	sort.Slice(devices, func(i, j int) bool {
+		if numericIndices {
+			left, _ := strconv.Atoi(devices[i].Index)
+			right, _ := strconv.Atoi(devices[j].Index)
+			return left < right
+		}
+		return devices[i].Index < devices[j].Index
+	})
 	return devices
 }
 

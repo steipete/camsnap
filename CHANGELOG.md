@@ -1,6 +1,11 @@
 # Changelog
 
 ## 0.3.0 - Unreleased
+- Show native webcam indices in the `devices` table alongside stable IDs, names, and default status.
+- Validate native webcam selectors before requesting macOS Camera permission.
+- Match native webcam names case-insensitively and report available or ambiguous matches.
+- Use the default native macOS webcam when `snap` is run without a camera or device.
+- Sort ffmpeg AVFoundation device indices numerically.
 - Fix native-to-ffmpeg snapshot fallback selecting the wrong camera when backend device orders differ.
 - Add native AVFoundation snapshots, device enumeration, and Camera permission handling to cgo-enabled macOS builds, plus plist-embedded and signed Darwin release artifacts.
 - Add first-class local webcam capture through macOS AVFoundation and Linux v4l2, including device enumeration, warm snapshot capture, video-only clips, motion watch, doctor probes, and TCC-aware errors.

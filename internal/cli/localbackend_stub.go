@@ -28,6 +28,10 @@ func nativeEnumerateLocalDevices() ([]localDevice, error) {
 	return nil, errNativeLocalBackendUnavailable
 }
 
-func nativeCaptureFrame(string, time.Duration, string) (string, error) {
-	return "", errNativeLocalBackendUnavailable
+func nativeResolveCaptureDevice(string) (localDevice, error) {
+	return localDevice{}, errNativeLocalBackendUnavailable
+}
+
+func nativeCaptureFrame(localDevice, time.Duration, string) error {
+	return errNativeLocalBackendUnavailable
 }

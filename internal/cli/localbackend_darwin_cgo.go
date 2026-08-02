@@ -37,31 +37,14 @@ func nativeEnumerateLocalDevices() ([]localDevice, error) {
 	return result, nil
 }
 
-func nativeCaptureFrame(device string, warmup time.Duration, output string) (string, error) {
+func nativeResolveCaptureDevice(selector string) (localDevice, error) {
 	devices, err := nativeEnumerateLocalDevices()
 	if err != nil {
-		return device, fmt.Errorf("enumerate native cameras: %w", err)
+		return localDevice{}, fmt.Errorf("enumerate native cameras: %w", err)
 	}
-	resolved, err := resolveNativeDevice(devices, device)
-	if err != nil {
-		return device, err
-	}
-	return nativeFFmpegFallbackSelector(resolved), avf.CaptureFrame(resolved.ID, warmup, output)
+	return resolveNativeDevice(devices, selector)
 }
 
-func nativeFFmpegFallbackSelector(device localDevice) string { return device.Name }
-
-func resolveNativeDevice(devices []localDevice, selector string) (localDevice, error) {
-	if index, err := strconv.Atoi(selector); err == nil {
-		if index < 0 || index >= len(devices) {
-			return localDevice{}, fmt.Errorf("native camera index %d is out of range (found %d devices)", index, len(devices))
-		}
-		return devices[index], nil
-	}
-	for _, device := range devices {
-		if device.ID == selector || device.Name == selector {
-			return device, nil
-		}
-	}
-	return localDevice{}, fmt.Errorf("native camera %q not found", selector)
+func nativeCaptureFrame(device localDevice, warmup time.Duration, output string) error {
+	return avf.CaptureFrame(device.ID, warmup, output)
 }

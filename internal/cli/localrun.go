@@ -46,10 +46,11 @@ func runLocalCapture(ctx context.Context, request localCaptureRequest) error {
 	}
 
 	if request.operation == localSnap && backend == capture.LocalBackendNative {
-		if err := preflightNativeCamera(ctx, true, request.notice); err != nil {
+		resolved, err := prepareNativeSnapshot(ctx, request, nativeResolveCaptureDevice, preflightNativeCamera)
+		if err != nil {
 			return err
 		}
-		fallbackDevice, err := nativeCaptureFrame(request.options.Device, request.options.Warmup, request.output)
+		err = nativeCaptureFrame(resolved, request.options.Warmup, request.output)
 		if err == nil {
 			return nil
 		}
@@ -62,7 +63,7 @@ func runLocalCapture(ctx context.Context, request localCaptureRequest) error {
 		if request.notice != nil {
 			request.notice(fmt.Sprintf("Native AVFoundation capture failed (%v); falling back to ffmpeg.", err))
 		}
-		request = withFFmpegFallbackDevice(request, fallbackDevice)
+		request = withFFmpegFallbackDevice(request, nativeFFmpegFallbackSelector(resolved))
 	}
 
 	if request.operation != localSnap {
@@ -71,6 +72,22 @@ func runLocalCapture(ctx context.Context, request localCaptureRequest) error {
 		}
 	}
 	return runLocalFFmpeg(ctx, request)
+}
+
+func prepareNativeSnapshot(
+	ctx context.Context,
+	request localCaptureRequest,
+	resolve func(string) (localDevice, error),
+	preflight func(context.Context, bool, func(...any)) error,
+) (localDevice, error) {
+	resolved, err := resolve(request.options.Device)
+	if err != nil {
+		return localDevice{}, fmt.Errorf("native local capture failed: %w", err)
+	}
+	if err := preflight(ctx, true, request.notice); err != nil {
+		return localDevice{}, err
+	}
+	return resolved, nil
 }
 
 func withFFmpegFallbackDevice(request localCaptureRequest, device string) localCaptureRequest {
