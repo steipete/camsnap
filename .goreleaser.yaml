@@ -5,6 +5,9 @@ project_name: camsnap
 changelog:
   disable: true
 
+release:
+  name_template: "camsnap {{ .Version }}"
+
 builds:
   - id: camsnap
     main: ./cmd/camsnap
