@@ -8,7 +8,7 @@ import (
 	"github.com/steipete/camsnap/internal/cli"
 )
 
-var version = "0.2.2"
+var version = "dev"
 
 func main() {
 	root := cli.NewRootCommand(version)
