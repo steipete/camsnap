@@ -41,35 +41,49 @@ func newDoctorCmd() *cobra.Command {
 			}
 
 			cmd.Printf("Config file: %s\n", path)
+			var nativeDevices []localDevice
+			var nativeDevicesErr error
+			if nativeLocalBackendAvailable() {
+				status, statusErr := nativeCameraAuthorizationStatus()
+				if statusErr != nil {
+					cmd.Printf("%s Camera authorization check failed: %v\n", sty.Err("✖"), statusErr)
+				} else if status == "denied" || status == "restricted" {
+					cmd.Printf("%s Camera authorization: %s\n%s\n", sty.Err("✖"), status, cameraPermissionRemediation)
+				} else if status == "authorized" {
+					cmd.Printf("%s Camera authorization: %s\n", sty.OK("✔"), status)
+				} else {
+					cmd.Printf("%s Camera authorization: %s\n", sty.Warn("!"), status)
+				}
+				nativeDevices, nativeDevicesErr = nativeEnumerateLocalDevices()
+				if nativeDevicesErr != nil {
+					cmd.Printf("%s Native camera enumeration failed: %v\n", sty.Err("✖"), nativeDevicesErr)
+				} else {
+					cmd.Printf("%s Native camera devices: %d\n", sty.OK("✔"), len(nativeDevices))
+				}
+			}
 			if len(cfg.Cameras) == 0 {
 				cmd.Println(sty.Warn("No cameras saved. Add one with camsnap add ..."))
 				return nil
 			}
 
-			var (
-				localDevices    []localDevice
-				localDevicesErr error
-			)
 			for _, cam := range cfg.Cameras {
 				if strings.EqualFold(cam.Protocol, "local") {
-					if ffmpegFound {
-						localDevices, localDevicesErr = enumerateLocalDevices(runtime.GOOS)
-					} else {
-						localDevicesErr = fmt.Errorf("ffmpeg missing")
-					}
-					break
-				}
-			}
-
-			for _, cam := range cfg.Cameras {
-				if strings.EqualFold(cam.Protocol, "local") {
-					options, err := capture.Resolve(cam, (captureFlagValues{
+					options, err := resolveCaptureOptions(cam, (captureFlagValues{
 						transport: transport,
 						rtspAuth:  authMode,
 					}).overrides(cmd))
 					if err != nil {
 						cmd.Printf("%s %s local camera invalid: %v\n", sty.Err("✖"), cam.Name, err)
 						continue
+					}
+					localDevices := nativeDevices
+					localDevicesErr := nativeDevicesErr
+					if options.LocalBackend == capture.LocalBackendFFmpeg {
+						if ffmpegFound {
+							localDevices, localDevicesErr = enumerateLocalDevices(runtime.GOOS)
+						} else {
+							localDevicesErr = fmt.Errorf("ffmpeg missing")
+						}
 					}
 					if localDevicesErr != nil {
 						cmd.Printf("%s %s device enumeration failed: %v\n", sty.Err("✖"), cam.Name, localDevicesErr)
@@ -80,8 +94,12 @@ func newDoctorCmd() *cobra.Command {
 						continue
 					}
 					if probe {
+						if !ffmpegFound {
+							cmd.Printf("%s %s local capture probe failed: ffmpeg missing\n", sty.Err("✖"), cam.Name)
+							continue
+						}
 						ctx, cancel := mediaexec.WithTimeout(context.Background(), timeout+2*time.Second)
-						err = runLocalCapture(ctx, localCaptureRequest{operation: localProbe, options: options})
+						err = runLocalCapture(ctx, localCaptureRequest{operation: localProbe, options: options, notice: cmd.PrintErrln})
 						cancel()
 						if err != nil {
 							cmd.Printf("%s %s local capture probe failed: %v\n", sty.Err("✖"), cam.Name, err)
@@ -102,7 +120,7 @@ func newDoctorCmd() *cobra.Command {
 					cmd.Printf("%s %s dial %s failed: %v\n", sty.Err("✖"), cam.Name, addr, err)
 					continue
 				}
-				options, err := capture.Resolve(cam, (captureFlagValues{
+				options, err := resolveCaptureOptions(cam, (captureFlagValues{
 					transport: transport,
 					rtspAuth:  authMode,
 				}).overrides(cmd))

@@ -29,6 +29,7 @@ func newWatchCmd() *cobra.Command {
 	var device string
 	var framerate int
 	var videoSize string
+	var localBackend string
 
 	cmd := &cobra.Command{
 		Use:   "watch",
@@ -40,22 +41,20 @@ func newWatchCmd() *cobra.Command {
 			if threshold <= 0 || threshold >= 1 {
 				return fmt.Errorf("--threshold must be between 0 and 1 (e.g., 0.2)")
 			}
-			if !mediaexec.HasBinary("ffmpeg") {
-				return fmt.Errorf("ffmpeg not found in PATH")
-			}
 			cam, selectedName, err := selectCaptureCamera(cmd, args, cameraName, device)
 			if err != nil {
 				return err
 			}
 			cameraName = selectedName
-			options, err := capture.Resolve(cam, (captureFlagValues{
-				transport: transport,
-				stream:    stream,
-				path:      path,
-				rtspAuth:  authMode,
-				device:    device,
-				framerate: framerate,
-				videoSize: videoSize,
+			options, err := resolveCaptureOptions(cam, (captureFlagValues{
+				transport:    transport,
+				stream:       stream,
+				path:         path,
+				rtspAuth:     authMode,
+				device:       device,
+				framerate:    framerate,
+				videoSize:    videoSize,
+				localBackend: localBackend,
 			}).overrides(cmd))
 			if err != nil {
 				return err
@@ -64,6 +63,9 @@ func newWatchCmd() *cobra.Command {
 				if _, ok := parseRTSPAuth(authMode); !ok {
 					return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
 				}
+			}
+			if !mediaexec.HasBinary("ffmpeg") {
+				return fmt.Errorf("ffmpeg not found in PATH")
 			}
 			if tmpl != "" {
 				action, err = applyTemplate(tmpl, cam.Name, 0, time.Now())
@@ -81,7 +83,7 @@ func newWatchCmd() *cobra.Command {
 
 			onLine := motionLineHandler(ctx, cameraName, cooldown, action, tmpl, jsonOutput, cmd)
 			if options.Kind == capture.KindLocal {
-				return runLocalCapture(ctx, localCaptureRequest{operation: localWatch, options: options, threshold: threshold, onLine: onLine})
+				return runLocalCapture(ctx, localCaptureRequest{operation: localWatch, options: options, threshold: threshold, onLine: onLine, notice: cmd.PrintErrln})
 			}
 			ffArgs, err := capture.WatchArgs(options, threshold, gort.GOOS)
 			if err != nil {
@@ -105,6 +107,7 @@ func newWatchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&device, "device", "", "Local video device index, name, or /dev/videoN path")
 	cmd.Flags().IntVar(&framerate, "framerate", 30, "Local capture framerate")
 	cmd.Flags().StringVar(&videoSize, "video-size", "", "Local capture size (e.g., 1280x720)")
+	cmd.Flags().StringVar(&localBackend, "local-backend", "", "Local snapshot backend (native|ffmpeg; watch always uses ffmpeg)")
 
 	return cmd
 }

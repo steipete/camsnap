@@ -26,6 +26,7 @@ func newClipCmd() *cobra.Command {
 	var device string
 	var framerate int
 	var videoSize string
+	var localBackend string
 
 	cmd := &cobra.Command{
 		Use:   "clip",
@@ -34,24 +35,22 @@ func newClipCmd() *cobra.Command {
 			if duration <= 0 {
 				return fmt.Errorf("--dur must be > 0")
 			}
-			if !mediaexec.HasBinary("ffmpeg") {
-				return fmt.Errorf("ffmpeg not found in PATH")
-			}
 			cam, selectedName, err := selectCaptureCamera(cmd, args, cameraName, device)
 			if err != nil {
 				return err
 			}
 			cameraName = selectedName
-			options, err := capture.Resolve(cam, (captureFlagValues{
-				transport:  transport,
-				stream:     stream,
-				path:       path,
-				rtspAuth:   authMode,
-				noAudio:    noAudio,
-				audioCodec: audioCodec,
-				device:     device,
-				framerate:  framerate,
-				videoSize:  videoSize,
+			options, err := resolveCaptureOptions(cam, (captureFlagValues{
+				transport:    transport,
+				stream:       stream,
+				path:         path,
+				rtspAuth:     authMode,
+				noAudio:      noAudio,
+				audioCodec:   audioCodec,
+				device:       device,
+				framerate:    framerate,
+				videoSize:    videoSize,
+				localBackend: localBackend,
 			}).overrides(cmd))
 			if err != nil {
 				return err
@@ -60,6 +59,9 @@ func newClipCmd() *cobra.Command {
 				if _, ok := parseRTSPAuth(authMode); !ok {
 					return fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
 				}
+			}
+			if !mediaexec.HasBinary("ffmpeg") {
+				return fmt.Errorf("ffmpeg not found in PATH")
 			}
 			if outPath == "" {
 				tmp, err := os.CreateTemp("", "camsnap-*.mp4")
@@ -76,7 +78,7 @@ func newClipCmd() *cobra.Command {
 			ctx, cancel := mediaexec.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			if options.Kind == capture.KindLocal {
-				return runLocalCapture(ctx, localCaptureRequest{operation: localClip, options: options, output: outPath, duration: duration})
+				return runLocalCapture(ctx, localCaptureRequest{operation: localClip, options: options, output: outPath, duration: duration, notice: cmd.PrintErrln})
 			}
 
 			ffArgs, err := capture.ClipArgs(options, duration, outPath, runtime.GOOS)
@@ -100,6 +102,7 @@ func newClipCmd() *cobra.Command {
 	cmd.Flags().StringVar(&device, "device", "", "Local video device index, name, or /dev/videoN path")
 	cmd.Flags().IntVar(&framerate, "framerate", 30, "Local capture framerate")
 	cmd.Flags().StringVar(&videoSize, "video-size", "", "Local capture size (e.g., 1280x720)")
+	cmd.Flags().StringVar(&localBackend, "local-backend", "", "Local snapshot backend (native|ffmpeg; clips always use ffmpeg)")
 
 	return cmd
 }

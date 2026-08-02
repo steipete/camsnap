@@ -21,7 +21,7 @@ env:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -108,6 +108,48 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: git checkout "$RELEASE_INPUT_TAG"
 
+      - name: Check signing and notarization credentials
+        id: release-credentials
+        env:
+          MACOS_SIGN_P12_BASE64: ${{ secrets.MACOS_SIGN_P12_BASE64 }}
+          MACOS_SIGN_P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          signing=false
+          notarization=false
+
+          signing_values=0
+          [ -n "$MACOS_SIGN_P12_BASE64" ] && signing_values=$((signing_values + 1))
+          [ -n "$MACOS_SIGN_P12_PASSWORD" ] && signing_values=$((signing_values + 1))
+          [ -n "$MACOS_SIGN_IDENTITY" ] && signing_values=$((signing_values + 1))
+          if [ "$signing_values" -eq 3 ]; then
+            signing=true
+          elif [ "$signing_values" -ne 0 ]; then
+            echo "::error::Set all three macOS signing secrets together"
+            exit 1
+          fi
+
+          notarization_values=0
+          [ -n "$APP_STORE_CONNECT_KEY_ID" ] && notarization_values=$((notarization_values + 1))
+          [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && notarization_values=$((notarization_values + 1))
+          [ -n "$APP_STORE_CONNECT_API_KEY_P8" ] && notarization_values=$((notarization_values + 1))
+          if [ "$notarization_values" -eq 3 ]; then
+            if [ "$signing" != true ]; then
+              echo "::error::Notarization requires the macOS signing secrets"
+              exit 1
+            fi
+            notarization=true
+          elif [ "$notarization_values" -ne 0 ]; then
+            echo "::error::Set all three notarization secrets together"
+            exit 1
+          fi
+
+          echo "signing=$signing" >> "$GITHUB_OUTPUT"
+          echo "notarization=$notarization" >> "$GITHUB_OUTPUT"
+
       - name: GoReleaser
         if: ${{ steps.existing-release.outputs.complete != 'true' }}
         uses: goreleaser/goreleaser-action@v7
@@ -117,6 +159,14 @@ jobs:
           args: release --clean --config /tmp/.goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MACOS_SIGN_P12_BASE64: ${{ secrets.MACOS_SIGN_P12_BASE64 }}
+          MACOS_SIGN_P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          # Consumed by scripts/sign-darwin.sh in the goreleaser post-build
+          # hook, so notarization completes before any artifact is published.
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
 
   update-homebrew-tap:
     runs-on: ubuntu-latest

@@ -12,4 +12,4 @@ Run `make all` to format, lint, and test the repository. Use `go build ./...` fo
 - `internal/rtsp`: RTSP URL construction and path manipulation.
 - `internal/rtspclient`: native RTSP frame capture through gortsplib.
 
-The config file format and all CLI commands, flags, defaults, and output are public contracts; preserve their behavior during refactors.
+The config file format and all CLI commands, flags, defaults, and output are public contracts **as shipped in tagged releases**; preserve that released behavior during refactors. Surface that has not appeared in any tagged release yet may still change freely before it first ships.

@@ -39,33 +39,49 @@ func findCamera(cfg config.Config, name string) (config.Camera, bool) {
 }
 
 type captureFlagValues struct {
-	transport  string
-	stream     string
-	client     string
-	path       string
-	rtspAuth   string
-	noAudio    bool
-	audioCodec string
-	device     string
-	framerate  int
-	videoSize  string
-	warmup     time.Duration
+	transport    string
+	stream       string
+	client       string
+	path         string
+	rtspAuth     string
+	noAudio      bool
+	audioCodec   string
+	device       string
+	framerate    int
+	videoSize    string
+	warmup       time.Duration
+	localBackend string
 }
 
 func (values captureFlagValues) overrides(cmd *cobra.Command) capture.Overrides {
 	return capture.Overrides{
-		Transport:  changedString(cmd, "rtsp-transport", values.transport),
-		Stream:     changedString(cmd, "stream", values.stream),
-		Client:     changedString(cmd, "rtsp-client", values.client),
-		Path:       changedString(cmd, "path", values.path),
-		RTSPAuth:   changedString(cmd, "rtsp-auth", values.rtspAuth),
-		NoAudio:    changedBool(cmd, "no-audio", values.noAudio),
-		AudioCodec: changedString(cmd, "audio-codec", values.audioCodec),
-		Device:     changedString(cmd, "device", values.device),
-		Framerate:  changedInt(cmd, "framerate", values.framerate),
-		VideoSize:  changedString(cmd, "video-size", values.videoSize),
-		Warmup:     changedDuration(cmd, "warmup", values.warmup),
+		Transport:    changedString(cmd, "rtsp-transport", values.transport),
+		Stream:       changedString(cmd, "stream", values.stream),
+		Client:       changedString(cmd, "rtsp-client", values.client),
+		Path:         changedString(cmd, "path", values.path),
+		RTSPAuth:     changedString(cmd, "rtsp-auth", values.rtspAuth),
+		NoAudio:      changedBool(cmd, "no-audio", values.noAudio),
+		AudioCodec:   changedString(cmd, "audio-codec", values.audioCodec),
+		Device:       changedString(cmd, "device", values.device),
+		Framerate:    changedInt(cmd, "framerate", values.framerate),
+		VideoSize:    changedString(cmd, "video-size", values.videoSize),
+		Warmup:       changedDuration(cmd, "warmup", values.warmup),
+		LocalBackend: changedString(cmd, "local-backend", values.localBackend),
 	}
+}
+
+func resolveCaptureOptions(cam config.Camera, overrides capture.Overrides) (capture.Options, error) {
+	options, err := capture.Resolve(cam, overrides)
+	if err != nil {
+		return capture.Options{}, err
+	}
+	if options.Kind == capture.KindLocal && options.LocalBackend == "" {
+		options.LocalBackend = defaultLocalBackend()
+	}
+	if options.Kind == capture.KindLocal && options.LocalBackend == capture.LocalBackendNative && !nativeLocalBackendAvailable() {
+		return capture.Options{}, fmt.Errorf("native local capture backend is not available in this build; use --local-backend ffmpeg")
+	}
+	return options, nil
 }
 
 func changedInt(cmd *cobra.Command, name string, value int) *int {

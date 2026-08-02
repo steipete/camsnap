@@ -13,11 +13,20 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
+	"github.com/steipete/camsnap/internal/capture"
 )
 
 type localDevice struct {
-	Index string `json:"index"`
-	Name  string `json:"name"`
+	ID        string `json:"id,omitempty"`
+	Index     string `json:"index,omitempty"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"default"`
+}
+
+type localDevicesOutput struct {
+	Backend             string        `json:"backend"`
+	AuthorizationStatus string        `json:"authorization_status,omitempty"`
+	Devices             []localDevice `json:"devices"`
 }
 
 var avfoundationDevicePattern = regexp.MustCompile(`\[(\d+)\]\s+(.+)$`)
@@ -27,15 +36,33 @@ func newDevicesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "devices",
 		Short: "List local video capture devices",
+		Long:  "List local video capture devices. On macOS, save cameras by AVFoundation unique ID or exact name; numeric indices can differ between backends and change with attached hardware.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			devices, err := enumerateLocalDevices(runtime.GOOS)
+			backend := capture.LocalBackendFFmpeg
+			authorizationStatus := ""
+			var (
+				devices []localDevice
+				err     error
+			)
+			if nativeLocalBackendAvailable() {
+				backend = capture.LocalBackendNative
+				authorizationStatus, err = nativeCameraAuthorizationStatus()
+				if err == nil {
+					devices, err = nativeEnumerateLocalDevices()
+				}
+			} else {
+				devices, err = enumerateLocalDevices(runtime.GOOS)
+			}
 			if err != nil {
 				return err
 			}
 			if jsonOutput {
 				encoder := json.NewEncoder(cmd.OutOrStdout())
 				encoder.SetIndent("", "  ")
-				return encoder.Encode(devices)
+				return encoder.Encode(localDevicesOutput{Backend: backend, AuthorizationStatus: authorizationStatus, Devices: devices})
+			}
+			if authorizationStatus != "" {
+				cmd.Printf("Camera authorization: %s\n", authorizationStatus)
 			}
 			if len(devices) == 0 {
 				if runtime.GOOS == "darwin" {
@@ -46,9 +73,16 @@ func newDevicesCmd() *cobra.Command {
 				return nil
 			}
 			writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
-			_, _ = fmt.Fprintln(writer, "INDEX\tNAME")
-			for _, device := range devices {
-				_, _ = fmt.Fprintf(writer, "%s\t%s\n", device.Index, device.Name)
+			if backend == capture.LocalBackendNative {
+				_, _ = fmt.Fprintln(writer, "ID\tNAME\tDEFAULT")
+				for _, device := range devices {
+					_, _ = fmt.Fprintf(writer, "%s\t%s\t%t\n", device.ID, device.Name, device.IsDefault)
+				}
+			} else {
+				_, _ = fmt.Fprintln(writer, "INDEX\tNAME")
+				for _, device := range devices {
+					_, _ = fmt.Fprintf(writer, "%s\t%s\n", device.Index, device.Name)
+				}
 			}
 			return writer.Flush()
 		},
@@ -110,7 +144,7 @@ func parseAVFoundationDevices(stderr string) []localDevice {
 
 func localDeviceVisible(devices []localDevice, configured string) bool {
 	for _, device := range devices {
-		if device.Index == configured || device.Name == configured {
+		if device.ID == configured || device.Index == configured || device.Name == configured {
 			return true
 		}
 	}

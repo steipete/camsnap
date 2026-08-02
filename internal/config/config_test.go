@@ -26,9 +26,10 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 				AudioCodec:    "aac",
 			},
 			{
-				Name:     "laptop",
-				Protocol: "local",
-				Device:   "0",
+				Name:         "laptop",
+				Protocol:     "local",
+				Device:       "0",
+				LocalBackend: "native",
 			},
 		},
 	}
@@ -48,7 +49,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if loaded.Cameras[0].RTSPTransport != "udp" || loaded.Cameras[0].Stream != "stream2" || loaded.Cameras[0].RTSPClient != "gortsplib" || !loaded.Cameras[0].NoAudio || loaded.Cameras[0].AudioCodec != "aac" {
 		t.Fatalf("round trip custom fields mismatch: %#v", loaded.Cameras[0])
 	}
-	if loaded.Cameras[1].Protocol != "local" || loaded.Cameras[1].Device != "0" {
+	if loaded.Cameras[1].Protocol != "local" || loaded.Cameras[1].Device != "0" || loaded.Cameras[1].LocalBackend != "native" {
 		t.Fatalf("round trip local device mismatch: %#v", loaded.Cameras[1])
 	}
 }
