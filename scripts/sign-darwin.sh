@@ -39,8 +39,7 @@ keychain="$sign_dir/camsnap-signing.keychain-db"
 keychain_password=$(uuidgen)
 cleanup() {
   security delete-keychain "$keychain" >/dev/null 2>&1 || true
-  rm -f "$certificate"
-  rmdir "$sign_dir" 2>/dev/null || true
+  rm -rf "$sign_dir"
 }
 trap cleanup EXIT
 
@@ -54,3 +53,30 @@ security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password"
 codesign --force --options runtime --timestamp --keychain "$keychain" -s "$MACOS_SIGN_IDENTITY" "$binary"
 codesign --verify --verbose "$binary"
 echo "Signed $binary with $MACOS_SIGN_IDENTITY"
+
+# Notarize before anything is published: this hook runs during the goreleaser
+# build phase, so a notarization rejection fails the release while all
+# artifacts are still local.
+notarize_values=0
+[[ -n ${APP_STORE_CONNECT_KEY_ID:-} ]] && notarize_values=$((notarize_values + 1))
+[[ -n ${APP_STORE_CONNECT_ISSUER_ID:-} ]] && notarize_values=$((notarize_values + 1))
+[[ -n ${APP_STORE_CONNECT_API_KEY_P8:-} ]] && notarize_values=$((notarize_values + 1))
+
+if [[ $notarize_values -ne 0 && $notarize_values -ne 3 ]]; then
+  echo "sign-darwin: set APP_STORE_CONNECT_KEY_ID, APP_STORE_CONNECT_ISSUER_ID, and APP_STORE_CONNECT_API_KEY_P8 together" >&2
+  exit 1
+fi
+
+if [[ $notarize_values -eq 3 ]]; then
+  key_file="$sign_dir/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+  printf '%s' "$APP_STORE_CONNECT_API_KEY_P8" >"$key_file"
+  chmod 600 "$key_file"
+  archive="$sign_dir/$(basename "$binary").zip"
+  ditto -c -k --keepParent "$binary" "$archive"
+  xcrun notarytool submit "$archive" --wait \
+    --key "$key_file" \
+    --key-id "$APP_STORE_CONNECT_KEY_ID" \
+    --issuer "$APP_STORE_CONNECT_ISSUER_ID"
+  rm -f "$key_file" "$archive"
+  echo "Notarized $binary"
+fi
