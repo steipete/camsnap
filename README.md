@@ -1,111 +1,144 @@
-# 📸 camsnap — One command to grab frames, clips, or motion alerts from RTSP/ONVIF cameras and local webcams.
+# camsnap 📸 — Frame first, questions later.
 
-## Install / Run
-- Homebrew (installs `ffmpeg` automatically): `brew install steipete/tap/camsnap`
-- Requirements for source run: Go 1.26+ and `ffmpeg` on PATH. Local snapshots and device listing use native AVFoundation in cgo-enabled macOS builds; clips and motion watch still use ffmpeg. Linux uses v4l2, and Windows local webcams are not supported.
-- Run in-place: `go run ./cmd/camsnap --help`
-- Run in Docker: `docker run --rm ghcr.io/steipete/camsnap --help`  
-  Mount volumes for persistent config and output:
-  ```sh
-  docker run --rm -v camsnap-config:/config -v "$PWD":/output \
-    ghcr.io/steipete/camsnap snap kitchen --out shot.jpg
-  ```
-- Camera name may be positional (e.g., `camsnap snap kitchen ...`).
-- If `--out` is omitted, snap/clip writes to a temp file and prints the path.
+[![CI](https://img.shields.io/github/actions/workflow/status/steipete/camsnap/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/steipete/camsnap/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/steipete/camsnap?style=flat-square)](https://github.com/steipete/camsnap/releases/latest)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-555?style=flat-square)](#platform-support)
+[![License](https://img.shields.io/github/license/steipete/camsnap?style=flat-square)](LICENSE)
+[![Homebrew](https://img.shields.io/badge/Homebrew-steipete%2Ftap-FBB040?style=flat-square&logo=homebrew)](https://github.com/steipete/homebrew-tap)
 
-## Config
-- Stored at `~/.config/camsnap/config.yaml` (XDG).
-- Per-camera defaults supported: `rtsp_transport`, `stream`, `rtsp_client`, `local_backend`, `no_audio`, `audio_codec`, `path` (for tokenized RTSP such as UniFi Protect).
+camsnap is a command-line tool for capturing snapshots and short clips from RTSP cameras, discovering ONVIF devices, and running motion-triggered shell actions. It also captures local webcams on macOS and Linux; Windows builds support network cameras.
 
-### Add a camera
+```console
+$ camsnap add --name kitchen --host 192.168.1.50 --user camera --pass 'camera-password'
+Added camera "kitchen"
+$ camsnap snap kitchen --out kitchen.jpg
+```
+
+Save a camera once, then address it by name for snapshots, clips, health checks, and motion detection.
+
+## Install
+
+Homebrew is the smallest install path on macOS and Linux. The formula installs `ffmpeg` as a dependency.
+
 ```sh
-go run ./cmd/camsnap add --name kitchen --host 192.168.0.175 --user tapo --pass 'secret' \
+brew install steipete/tap/camsnap
+```
+
+Prebuilt binaries for macOS, Linux, and Windows are available from [GitHub Releases](https://github.com/steipete/camsnap/releases/latest). Install `ffmpeg` separately when using a release binary; Windows supports RTSP cameras but not local webcams.
+
+You can also run camsnap in a container or build it from source. See [Docker usage](docs/docker.md) or [Development](#development).
+
+## Quick start
+
+Add an RTSP camera, confirm the saved configuration, then capture a frame:
+
+```sh
+camsnap add --name kitchen --host 192.168.1.50 \
+  --user camera --pass 'camera-password'
+camsnap list
+camsnap snap kitchen --out kitchen.jpg
+```
+
+Replace the example host and credentials with values from your camera.
+
+The default RTSP transport is TCP and the default stream is `stream1`. Use camera-specific defaults when needed:
+
+```sh
+camsnap add --name kitchen --host 192.168.1.50 \
+  --user camera --pass 'camera-password' \
   --rtsp-transport udp --stream stream2 --rtsp-client gortsplib
 ```
-For UniFi Protect (RTSP token), enable RTSP in Protect, copy the stream URL, and add it with the token path:
+
+camsnap stores configuration in `~/.config/camsnap/config.yaml`, or `$XDG_CONFIG_HOME/camsnap/config.yaml` when `XDG_CONFIG_HOME` is set. The file contains camera credentials in plain text and is written with user-only permissions. Use `--config` to choose another path.
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `add` | Add or update a saved RTSP or local camera. |
+| `list` | List saved cameras without exposing passwords. |
+| `snap` | Capture one frame to a file. |
+| `clip` | Record a short clip. |
+| `watch` | Detect scene changes and run a shell action. |
+| `discover` | Find ONVIF devices on the local network. |
+| `devices` | List local video inputs. |
+| `doctor` | Check `ffmpeg`, connectivity, and optional capture probes. |
+
+Run `camsnap <command> --help` for the complete flags and defaults.
+
+### Clips
+
+camsnap copies the video stream when possible. Drop audio or transcode it to AAC when a camera's source audio is not MP4-compatible.
+
 ```sh
-go run ./cmd/camsnap add --name ssg15-livingroom --host 192.168.1.1 --port 7447 \
-  --protocol rtsp --path Bfy47SNWz9n2WRrw
+camsnap clip kitchen --dur 5s --no-audio --out kitchen.mp4
+camsnap clip kitchen --dur 5s --audio-codec aac --out kitchen.mp4
 ```
 
-### Snapshot
+When `--out` is omitted, `snap` and `clip` write to a temporary file and print its path.
+
+### Motion actions
+
+`watch` uses ffmpeg scene-change detection and applies a cooldown between actions:
+
 ```sh
-go run ./cmd/camsnap snap kitchen --out shot.jpg
-# or rely on per-camera defaults; set as needed:
-#   --rtsp-transport tcp|udp  --stream stream1|stream2  --rtsp-client ffmpeg|gortsplib
-# For Protect tokenized streams:
-#   go run ./cmd/camsnap snap ssg15-livingroom --path Bfy47SNWz9n2WRrw --out shot.jpg
-# (Longer timeouts like --timeout 20s may help Protect streams deliver the first keyframe.)
+camsnap watch kitchen --threshold 0.2 --cooldown 5s --json \
+  --action 'touch /tmp/camsnap-motion'
 ```
 
-### Clip
+The action receives `CAMSNAP_CAMERA`, `CAMSNAP_SCORE`, and `CAMSNAP_TIME`. Pass `--duration` to stop after a fixed interval or `--action-template` to interpolate `{camera}`, `{score}`, and `{time}` into the command.
+
+### Discovery and diagnostics
+
+Find ONVIF cameras on the current network, then check saved cameras:
+
 ```sh
-go run ./cmd/camsnap clip kitchen --dur 5s --no-audio --out clip.mp4
-# video is copied; audio can be dropped (--no-audio) or transcoded (--audio-codec aac)
-# Protect example:
-#   go run ./cmd/camsnap clip ssg15-livingroom --path Bfy47SNWz9n2WRrw --dur 5s --out clip.mp4
+camsnap discover --info
+camsnap doctor --probe
 ```
 
-### Motion watch
-```sh
-go run ./cmd/camsnap watch kitchen --threshold 0.2 --cooldown 5s \
-  --json --action 'touch /tmp/motion-$(date +%s)'
-# env passed to action: CAMSNAP_CAMERA, CAMSNAP_SCORE, CAMSNAP_TIME
-# Protect example (tokenized path):
-#   go run ./cmd/camsnap watch ssg15-livingroom --path Bfy47SNWz9n2WRrw --threshold 0.2 --action 'touch /tmp/motion'
-```
+`discover --info` attempts ONVIF device-information requests and uses saved credentials for matching hosts. `doctor --probe` classifies authentication, network, local-device, and macOS Camera permission failures.
 
-### Discover (ONVIF)
-```sh
-go run ./cmd/camsnap discover --info
-```
+## Camera sources
 
-### Doctor
-```sh
-go run ./cmd/camsnap doctor --probe --rtsp-transport udp
-```
+### RTSP and RTSPS
 
-## Local webcams
+Saved cameras can set defaults for transport, stream, RTSP client, audio handling, and an explicit stream path. Command flags override those defaults.
 
-List local video inputs, then either save one in the camera config or use it ad hoc. Official macOS builds use native AVFoundation for this command and for snapshots; the native table shows `INDEX`, `ID`, `NAME`, and `DEFAULT`. A macOS device can be its unique ID, case-insensitive name, or listed integer index. When saving a macOS camera, prefer its AVFoundation unique ID (or name): numeric indices can differ between the native and ffmpeg backends and can change when hardware is attached or removed. Reserve indices for convenient one-off captures. Linux and macOS builds without cgo use ffmpeg-backed enumeration; on Linux use a `/dev/videoN` path.
+Use `--path` for cameras whose stream URL contains an opaque token instead of `stream1` or `stream2`. See [RTSP camera setup](docs/rtsp-cameras.md) for tokenized UniFi Protect streams and tuning controls.
+
+### Local webcams
+
+On macOS, official builds use native AVFoundation for device listing and snapshots; clips and motion detection use ffmpeg. Linux uses v4l2 through ffmpeg.
 
 ```sh
 camsnap devices
-camsnap devices --json
-
-# Save a macOS camera by the ID shown by `camsnap devices`, then use the same snap/clip/watch commands as RTSP cameras.
-camsnap add --name mbp --protocol local --device '<avfoundation-unique-id>' --local-backend native
-camsnap snap mbp --out shot.jpg
-camsnap clip mbp --dur 5s --out clip.mp4
-camsnap watch mbp --threshold 0.2 --action 'touch /tmp/motion'
-
-# Or capture without adding a camera first.
-camsnap snap --out default-camera.jpg
-camsnap snap --device 0 --framerate 30 --video-size 1280x720 --warmup 1s --out shot.jpg
-camsnap snap --device 0 --local-backend ffmpeg --out ffmpeg-shot.jpg
-camsnap clip --device /dev/video0 --dur 5s --out clip.mp4
+camsnap snap --device 0 --out webcam.jpg
 ```
 
-`--local-backend native|ffmpeg` mirrors the per-camera `local_backend` setting. Native is the default when compiled into a cgo-enabled macOS build; ffmpeg is the default elsewhere and is always used for clip/watch. In a native macOS build, bare `camsnap snap` uses the device marked `DEFAULT`; clip and watch still require a camera or device, and bare snap does not guess when the ffmpeg backend is selected. Selecting `native` in a build where it is unavailable returns an error. Local snapshots warm up the camera before keeping the final JPEG so auto-exposure can settle. Local clips are video-only for now: camsnap encodes H.264 and does not request microphone access.
+See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Camera permission behavior, Linux device paths, and backend selection.
 
-On macOS, the signed native build performs the Camera permission request itself. Device selectors are validated first, so an invalid `--device` fails with the available choices before any permission prompt. TCC still follows responsible-process rules: a terminal launch normally attributes Camera access to Terminal, iTerm, or the other launching terminal, while a signed camsnap binary launched directly from launchd or a script is attributed to camsnap. Grant the entry macOS shows in **System Settings → Privacy & Security → Camera**. An SSH session cannot display the permission prompt; if access was previously denied, run `tccutil reset Camera` locally and retry from a local launch. Continuity Camera is listed only while the iPhone is nearby and unlocked.
+## Platform support
 
-Use `make build` for a local macOS binary with the required embedded usage-description plist and an ad-hoc signature. Set `CAMSNAP_CODESIGN_IDENTITY` to use a local Developer ID identity instead. The official release artifacts carry the same plist and are signed in the release workflow.
+| Platform | RTSP cameras | Local webcams |
+| --- | --- | --- |
+| macOS | Yes | Native snapshots; ffmpeg clips and motion |
+| Linux | Yes | v4l2 through ffmpeg |
+| Windows | Yes | No |
+| Docker | Yes | No direct device capture |
 
-Direct local-device capture is not supported from the camsnap Docker image. Windows local webcams are also unsupported; RTSP cameras continue to work on both Docker and Windows builds.
+## Development
 
-## Tapo specifics
-- Enable “Third‑Party NVR/RTSP” and set a per‑camera account; disable Privacy Mode.
-- TC70 often needs `udp` + `stream2` + `gortsplib` and may require disabling Tapo Care/SD recording to free RTSP streams.
-- C225 works with `udp` + `stream1` (ffmpeg client).
-- mp4 + PCMA audio can fail; use `--no-audio` or `--audio-codec aac`.
+Source builds require Go 1.26 or newer and `ffmpeg` on `PATH`.
 
-## Behavior notes
-- Motion uses ffmpeg scene-change detection; actions can log JSON (`--json`).
-- Doctor classifies ffmpeg probe errors (auth, network, local-device, and macOS Camera permission failures).
-- Per-camera defaults reduce flag noise for devices with quirks.
+```sh
+make build
+make lint
+make test
+```
 
-## Roadmap
-- ONVIF device-info fetch with WS-Security.
-- Ubiquiti Protect local API integration.
-- Smarter RTSP fallback / retries.
+`make build` embeds the Camera usage description and signs the binary on macOS. Run `go run ./cmd/camsnap --help` for an unsigned source invocation that does not access a local camera.
+
+## License
+
+[MIT](LICENSE)

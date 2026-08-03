@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.3.1 - Unreleased
+- Rewrite the README around installation, first capture, and focused camera setup guides.
 
 ## 0.3.0 - 2026-08-02
 - Show native webcam indices in the `devices` table alongside stable IDs, names, and default status.
