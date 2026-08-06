@@ -31,6 +31,7 @@ func NewRootCommand(version string) *cobra.Command {
 		newClipCmd(),
 		newDiscoverCmd(),
 		newDevicesCmd(),
+		newPTZCmd(),
 		newWatchCmd(),
 		newDoctorCmd(),
 		newVersionCmd(version),
@@ -53,6 +54,7 @@ func exampleText() string {
 	b.WriteString("  camsnap snap kitchen --out shot.jpg\n")
 	b.WriteString("  camsnap snap --device 0 --out webcam.jpg\n")
 	b.WriteString("  camsnap devices\n")
+	b.WriteString("  camsnap ptz status --device 0\n")
 	b.WriteString("  camsnap clip kitchen --dur 5s --no-audio --out clip.mp4\n")
 	b.WriteString("  camsnap watch kitchen --threshold 0.2 --cooldown 5s --json --action 'touch /tmp/motion'\n")
 	b.WriteString("  camsnap doctor --probe --rtsp-transport udp\n")
