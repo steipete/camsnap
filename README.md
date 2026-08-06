@@ -62,6 +62,7 @@ camsnap stores configuration in `~/.config/camsnap/config.yaml`, or `$XDG_CONFIG
 | `watch` | Detect scene changes and run a shell action. |
 | `discover` | Find ONVIF devices on the local network. |
 | `devices` | List local video inputs. |
+| `ptz` | Control pan, tilt, and zoom on supported USB webcams. |
 | `doctor` | Check `ffmpeg`, connectivity, and optional capture probes. |
 
 Run `camsnap <command> --help` for the complete flags and defaults.
@@ -114,9 +115,13 @@ On macOS, official builds use native AVFoundation for device listing and snapsho
 ```sh
 camsnap devices
 camsnap snap --device 0 --out webcam.jpg
+camsnap ptz status --device 0
+camsnap ptz goto --device 0 --pan 12.5 --tilt -5 --zoom 50
+camsnap ptz move --device 0 --pan -10 --zoom 5
+camsnap ptz home --device 0
 ```
 
-See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Camera permission behavior, Linux device paths, and backend selection.
+See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Camera permission behavior, UVC PTZ control, Linux device paths, and backend selection.
 
 ## Platform support
 

@@ -1,6 +1,7 @@
 # Changelog
 
-## 0.3.1 - Unreleased
+## 0.4.0 - Unreleased
+- Add pan, tilt, zoom, status, and home controls for UVC USB cameras on macOS.
 - Rewrite the README around installation, first capture, and focused camera setup guides.
 
 ## 0.3.0 - 2026-08-02

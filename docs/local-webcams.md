@@ -52,6 +52,23 @@ tccutil reset Camera
 
 Continuity Camera appears only while the iPhone is nearby and unlocked.
 
+## Pan, tilt, and zoom
+
+On macOS, `camsnap ptz` controls USB webcams that advertise standard UVC camera-terminal pan, tilt, or zoom controls. It accepts the same native index, stable AVFoundation ID, or camera name as `snap --device`; omitting `--device` selects the default camera.
+
+```sh
+camsnap ptz status --device 0
+camsnap ptz goto --device 0 --pan 12.5 --tilt -5 --zoom 50
+camsnap ptz move --device 0 --pan -10 --zoom 5
+camsnap ptz home --device 0
+```
+
+`goto` uses absolute pan and tilt angles in degrees and zoom from 0–100 percent. `move` takes degree deltas and zoom percentage-point deltas. Values are clamped and snapped to the ranges reported by the camera, and the command prints the positions actually applied. `home` uses each control's UVC default, falling back to zero pan/tilt and minimum zoom when a device does not report defaults. Every subcommand supports `--json`.
+
+The status table shows raw UVC ranges: pan and tilt use arcseconds, while zoom units are device-specific. Relative moves are implemented as a current-position read followed by a clamped absolute write because native UVC relative-speed controls vary between devices.
+
+PTZ requires a cgo-enabled macOS build and a directly attached USB UVC camera with absolute controls. Built-in cameras, Studio Display cameras, Continuity Camera, and devices that do not expose UVC PTZ controls return a named unsupported-camera error.
+
 ## Building the native backend
 
 `make build` embeds the Camera usage-description plist and applies an ad-hoc signature. Set `CAMSNAP_CODESIGN_IDENTITY` to use a local Developer ID identity instead.
