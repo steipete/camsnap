@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"net"
 	"strings"
 	"time"
 
@@ -39,8 +40,9 @@ func newDiscoverCmd() *cobra.Command {
 						infoStr = " [" + info + "]"
 					}
 				}
+				host := hostOnly(d.Host)
 				cmd.Printf("%s\t(add: camsnap add --name cam-%s --host %s --user <user> --pass <pass>)%s\n",
-					sty.OK(d.Host), safeName(d.Host), d.Host, infoStr)
+					sty.OK(d.Host), safeName(host), host, infoStr)
 			}
 			return nil
 		},
@@ -50,14 +52,24 @@ func newDiscoverCmd() *cobra.Command {
 	return cmd
 }
 
-func safeName(host string) string {
-	// use host part without port for a short name
-	for i, r := range host {
-		if r == ':' {
-			return host[:i]
-		}
+// hostOnly strips the port from a "host:port" pair (net.SplitHostPort is
+// bracket-aware, so IPv6 literals like "[fe80::1]:80" split correctly).
+// discovered devices report their ONVIF/SOAP service port, not the RTSP
+// port -- `add` defaults --port to 554 (RTSP's default) when omitted, so
+// dropping the discovered port here is deliberate, not an oversight.
+func hostOnly(hostPort string) string {
+	if h, _, err := net.SplitHostPort(hostPort); err == nil {
+		return h
 	}
-	return host
+	return hostPort
+}
+
+// safeName turns a bare host (already run through hostOnly) into a short,
+// config-key-safe suffix for the suggested --name. IPv6 literals keep
+// internal colons after bracket-stripping (e.g. "fe80::1"); those are not
+// safe in a bare camera name, so every ':' becomes '-'.
+func safeName(host string) string {
+	return strings.ReplaceAll(host, ":", "-")
 }
 
 func fetchInfo(ctx context.Context, cfg config.Config, d discovery.Device) string {
