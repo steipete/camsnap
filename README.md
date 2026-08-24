@@ -119,7 +119,10 @@ camsnap ptz status --device 0
 camsnap ptz goto --device 0 --pan 12.5 --tilt -5 --zoom 50
 camsnap ptz move --device 0 --pan -10 --zoom 5
 camsnap ptz home --device 0
+camsnap ptz goto --device 0 --pan 45 --settle 3s --timeout 6s
 ```
+
+PTZ commands keep the selected camera streaming while reading or changing its position, so they require macOS Camera permission. Motion commands verify the observed position after `--settle` (default `2s`) and fail if it does not stabilize before `--timeout` (default `5s`).
 
 See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Camera permission behavior, UVC PTZ control, Linux device paths, and backend selection.
 

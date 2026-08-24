@@ -233,6 +233,55 @@ int avf_request_access(unsigned long long token, char **error_out) {
 
 @end
 
+@interface AVFStreamSession : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
+
+@property(nonatomic, readonly) AVCaptureSession *session;
+@property(nonatomic, readonly) dispatch_semaphore_t semaphore;
+
+- (instancetype)initWithSession:(AVCaptureSession *)session output:(AVCaptureVideoDataOutput *)output;
+- (void)stop;
+
+@end
+
+@implementation AVFStreamSession {
+    AVCaptureVideoDataOutput *_output;
+    dispatch_queue_t _queue;
+    BOOL _received_frame;
+}
+
+- (instancetype)initWithSession:(AVCaptureSession *)session output:(AVCaptureVideoDataOutput *)output {
+    self = [super init];
+    if (self != nil) {
+        _session = session;
+        _output = output;
+        _queue = dispatch_queue_create("com.steipete.camsnap.avf.stream", DISPATCH_QUEUE_SERIAL);
+        _semaphore = dispatch_semaphore_create(0);
+        [_output setSampleBufferDelegate:self queue:_queue];
+    }
+    return self;
+}
+
+- (void)captureOutput:(AVCaptureOutput *)output
+    didOutputSampleBuffer:(CMSampleBufferRef)sample_buffer
+           fromConnection:(AVCaptureConnection *)connection {
+    (void)output;
+    (void)sample_buffer;
+    (void)connection;
+
+    if (!_received_frame) {
+        _received_frame = YES;
+        dispatch_semaphore_signal(_semaphore);
+    }
+}
+
+- (void)stop {
+    [_session stopRunning];
+    [_output setSampleBufferDelegate:nil queue:NULL];
+    dispatch_sync(_queue, ^{});
+}
+
+@end
+
 static AVCaptureDevice *AVFFindDevice(const char *device_id) {
     if (device_id == NULL || device_id[0] == '\0') {
         return [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
@@ -247,25 +296,113 @@ static AVCaptureDevice *AVFFindDevice(const char *device_id) {
     return nil;
 }
 
+static BOOL AVFCheckAuthorization(char **error_out) {
+    AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+    if (status == AVAuthorizationStatusAuthorized) {
+        return YES;
+    }
+
+    NSString *status_name = @"unknown";
+    switch (status) {
+        case AVAuthorizationStatusNotDetermined:
+            status_name = @"notDetermined";
+            break;
+        case AVAuthorizationStatusRestricted:
+            status_name = @"restricted";
+            break;
+        case AVAuthorizationStatusDenied:
+            status_name = @"denied";
+            break;
+        case AVAuthorizationStatusAuthorized:
+            break;
+    }
+    AVFSetError(error_out, [NSString stringWithFormat:@"camera access is %@", status_name]);
+    return NO;
+}
+
+void *avf_open_session(const char *device_id, char **error_out) {
+    @autoreleasepool {
+        if (!AVFCheckAuthorization(error_out)) {
+            return NULL;
+        }
+
+        @try {
+            AVCaptureDevice *device = AVFFindDevice(device_id);
+            if (device == nil) {
+                AVFSetError(error_out, device_id == NULL || device_id[0] == '\0'
+                    ? @"no default video capture device"
+                    : @"video capture device not found");
+                return NULL;
+            }
+
+            NSError *input_error = nil;
+            AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&input_error];
+            if (input == nil) {
+                AVFSetError(error_out, [NSString stringWithFormat:@"create device input: %@", input_error.localizedDescription]);
+                return NULL;
+            }
+
+            AVCaptureSession *session = [[AVCaptureSession alloc] init];
+            AVCaptureVideoDataOutput *output = [[AVCaptureVideoDataOutput alloc] init];
+            output.alwaysDiscardsLateVideoFrames = YES;
+            output.videoSettings = @{
+                (__bridge NSString *)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
+            };
+
+            [session beginConfiguration];
+            if (![session canAddInput:input]) {
+                [session commitConfiguration];
+                AVFSetError(error_out, @"capture session rejected device input");
+                return NULL;
+            }
+            [session addInput:input];
+            if (![session canAddOutput:output]) {
+                [session commitConfiguration];
+                AVFSetError(error_out, @"capture session rejected video output");
+                return NULL;
+            }
+            [session addOutput:output];
+            [session commitConfiguration];
+
+            AVFStreamSession *stream = [[AVFStreamSession alloc] initWithSession:session output:output];
+            [session startRunning];
+            long wait_result = dispatch_semaphore_wait(
+                stream.semaphore,
+                dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)
+            );
+            if (wait_result != 0) {
+                [stream stop];
+                AVFSetError(error_out, @"timed out waiting for a video frame");
+                return NULL;
+            }
+            return (__bridge_retained void *)stream;
+        } @catch (NSException *exception) {
+            AVFSetError(error_out, [NSString stringWithFormat:@"open capture session: %@", exception.reason]);
+            return NULL;
+        }
+    }
+}
+
+int avf_close_session(void *session, char **error_out) {
+    @autoreleasepool {
+        if (session == NULL) {
+            return 1;
+        }
+
+        AVFStreamSession *stream = (__bridge_transfer AVFStreamSession *)session;
+        @try {
+            [stream stop];
+            return 1;
+        } @catch (NSException *exception) {
+            AVFSetError(error_out, [NSString stringWithFormat:@"close capture session: %@", exception.reason]);
+            return 0;
+        }
+    }
+}
+
 int avf_capture_frame(const char *device_id, double warmup_seconds, const char *out_path, char **error_out) {
     @autoreleasepool {
-        AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
-        if (status != AVAuthorizationStatusAuthorized) {
-            NSString *status_name = @"unknown";
-            switch (status) {
-                case AVAuthorizationStatusNotDetermined:
-                    status_name = @"notDetermined";
-                    break;
-                case AVAuthorizationStatusRestricted:
-                    status_name = @"restricted";
-                    break;
-                case AVAuthorizationStatusDenied:
-                    status_name = @"denied";
-                    break;
-                case AVAuthorizationStatusAuthorized:
-                    break;
-            }
-            AVFSetError(error_out, [NSString stringWithFormat:@"camera access is %@", status_name]);
+        if (!AVFCheckAuthorization(error_out)) {
             return 0;
         }
 

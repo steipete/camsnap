@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.4.1 - Unreleased
+- Keep UVC PTZ cameras streaming during control, verify settled positions through fresh connections, and add configurable motion timing.
 
 ## 0.4.0 - 2026-08-06
 - Add pan, tilt, zoom, status, and home controls for UVC USB cameras on macOS.

@@ -31,6 +31,12 @@ type Device struct {
 	IsDefault bool
 }
 
+// Session keeps a camera's video stream active without saving any frames.
+type Session struct {
+	mu     sync.Mutex
+	handle unsafe.Pointer
+}
+
 var (
 	accessSequence atomic.Uint64
 	accessMu       sync.Mutex
@@ -101,6 +107,40 @@ func RequestAccess(ctx context.Context) (bool, error) {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	}
+}
+
+// OpenSession starts a video capture session for deviceID and waits for its
+// first frame. An empty deviceID selects the default camera.
+func OpenSession(deviceID string) (*Session, error) {
+	cDeviceID := C.CString(deviceID)
+	defer C.free(unsafe.Pointer(cDeviceID))
+
+	var cErr *C.char
+	handle := C.avf_open_session(cDeviceID, &cErr)
+	if handle == nil {
+		return nil, bridgeError(cErr, "open capture session")
+	}
+	return &Session{handle: handle}, nil
+}
+
+// Close stops the video capture session and releases its camera resources.
+func (s *Session) Close() error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.handle == nil {
+		return nil
+	}
+
+	handle := s.handle
+	s.handle = nil
+	var cErr *C.char
+	if C.avf_close_session(handle, &cErr) == 0 {
+		return bridgeError(cErr, "close capture session")
+	}
+	return nil
 }
 
 // CaptureFrame starts a capture session for deviceID and writes one JPEG frame
