@@ -61,9 +61,14 @@ camsnap ptz status --device 0
 camsnap ptz goto --device 0 --pan 12.5 --tilt -5 --zoom 50
 camsnap ptz move --device 0 --pan -10 --zoom 5
 camsnap ptz home --device 0
+camsnap ptz goto --device 0 --pan 45 --settle 3s --timeout 6s
 ```
 
-`goto` uses absolute pan and tilt angles in degrees and zoom from 0–100 percent. `move` takes degree deltas and zoom percentage-point deltas. Values are clamped and snapped to the ranges reported by the camera, and the command prints the positions actually applied. `home` uses each control's UVC default, falling back to zero pan/tilt and minimum zoom when a device does not report defaults. Every subcommand supports `--json`.
+Some gimbal webcams service UVC controls only while their video stream is active: without a stream, position reads can be stale and accepted movement commands can be silently ignored. Every `ptz` subcommand starts a temporary AVFoundation capture session before accessing UVC, keeps the stream active throughout the operation, and stops it afterward without saving a frame. This requires the same macOS Camera permission as native snapshots.
+
+`goto` uses absolute pan and tilt angles in degrees and zoom from 0–100 percent. `move` takes degree deltas and zoom percentage-point deltas. Values are clamped and snapped to the ranges reported by the camera, and the command prints the observed positions after they stabilize. `home` uses each control's UVC default, falling back to zero pan/tilt and minimum zoom when a device does not report defaults. Every subcommand supports `--json`.
+
+The motion commands accept `--settle` (default `2s`) to give the gimbal time to reach its target and `--timeout` (default `5s`) for the overall verification wait. Verification uses a fresh UVC connection that never issued the movement command, because the original connection can echo an uncommitted setpoint even when the camera did not move. If the observed position differs from the requested target by more than the camera's reported control resolution, the command fails. Confirm that the camera can stream and disable any on-camera AI framing or tracking that overrides manual positioning before retrying.
 
 The status table shows raw UVC ranges: pan and tilt use arcseconds, while zoom units are device-specific. Relative moves are implemented as a current-position read followed by a clamped absolute write because native UVC relative-speed controls vary between devices.
 
