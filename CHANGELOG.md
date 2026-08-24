@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.4.2 - Unreleased
+
 ## 0.4.1 - 2026-08-24
 - Fix `ptz goto`, `move`, and `home` reporting success for movements the camera never performed.
 - Keep UVC PTZ cameras streaming during control and verify settled positions through a fresh control connection.
