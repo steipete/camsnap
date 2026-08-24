@@ -1,3 +1,5 @@
+//go:build darwin && cgo
+
 #import "bridge.h"
 
 #import <CoreFoundation/CoreFoundation.h>
