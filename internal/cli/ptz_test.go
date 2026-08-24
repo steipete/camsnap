@@ -29,9 +29,11 @@ type fakePTZController struct {
 }
 
 type fakePTZSession struct {
-	closed bool
-	events *[]string
-	sleeps []time.Duration
+	closed         bool
+	events         *[]string
+	sleeps         []time.Duration
+	captures       []string
+	captureWarmups []time.Duration
 }
 
 func (s *fakePTZSession) Close() error {

@@ -241,6 +241,7 @@ int avf_request_access(unsigned long long token, char **error_out) {
 @property(nonatomic, readonly) dispatch_semaphore_t semaphore;
 
 - (instancetype)initWithSession:(AVCaptureSession *)session output:(AVCaptureVideoDataOutput *)output;
+- (BOOL)captureFrameAtPath:(NSString *)output_path warmup:(NSTimeInterval)warmup error:(char **)error_out;
 - (void)stop;
 
 @end
@@ -274,6 +275,31 @@ int avf_request_access(unsigned long long token, char **error_out) {
         _received_frame = YES;
         dispatch_semaphore_signal(_semaphore);
     }
+}
+
+- (BOOL)captureFrameAtPath:(NSString *)output_path warmup:(NSTimeInterval)warmup error:(char **)error_out {
+    AVFFrameReceiver *receiver = [[AVFFrameReceiver alloc]
+        initWithOutputPath:output_path
+                    warmup:warmup];
+    [_output setSampleBufferDelegate:receiver queue:_queue];
+
+    NSTimeInterval timeout_seconds = warmup + 10.0;
+    long wait_result = dispatch_semaphore_wait(
+        receiver.semaphore,
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout_seconds * NSEC_PER_SEC))
+    );
+    [_output setSampleBufferDelegate:self queue:_queue];
+    dispatch_sync(_queue, ^{});
+
+    if (wait_result != 0) {
+        AVFSetError(error_out, @"timed out waiting for a video frame");
+        return NO;
+    }
+    if (receiver.failure != nil) {
+        AVFSetError(error_out, receiver.failure);
+        return NO;
+    }
+    return YES;
 }
 
 - (void)stop {
@@ -397,6 +423,24 @@ int avf_close_session(void *session, char **error_out) {
             return 1;
         } @catch (NSException *exception) {
             AVFSetError(error_out, [NSString stringWithFormat:@"close capture session: %@", exception.reason]);
+            return 0;
+        }
+    }
+}
+
+int avf_capture_session_frame(void *session, double warmup_seconds, const char *out_path, char **error_out) {
+    @autoreleasepool {
+        if (session == NULL || out_path == NULL || out_path[0] == '\0') {
+            AVFSetError(error_out, @"capture session and output path are required");
+            return 0;
+        }
+
+        @try {
+            AVFStreamSession *stream = (__bridge AVFStreamSession *)session;
+            NSString *output_path = [NSString stringWithUTF8String:out_path];
+            return [stream captureFrameAtPath:output_path warmup:warmup_seconds error:error_out] ? 1 : 0;
+        } @catch (NSException *exception) {
+            AVFSetError(error_out, [NSString stringWithFormat:@"capture session frame: %@", exception.reason]);
             return 0;
         }
     }

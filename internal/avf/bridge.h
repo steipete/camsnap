@@ -17,6 +17,7 @@ int avf_request_access(unsigned long long token, char **error_out);
 
 void *avf_open_session(const char *device_id, char **error_out);
 int avf_close_session(void *session, char **error_out);
+int avf_capture_session_frame(void *session, double warmup_seconds, const char *out_path, char **error_out);
 int avf_capture_frame(const char *device_id, double warmup_seconds, const char *out_path, char **error_out);
 
 extern void goAVFAccessResult(unsigned long long token, int granted);
