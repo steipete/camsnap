@@ -50,3 +50,16 @@ func TestCaptureFrameRequiresOutputPath(t *testing.T) {
 		t.Fatal("CaptureFrame returned nil error for an empty output path")
 	}
 }
+
+func TestSessionCaptureFrameRejectsInvalidInput(t *testing.T) {
+	var session *Session
+	if err := session.CaptureFrame(0, ""); err == nil {
+		t.Fatal("CaptureFrame returned nil error for an empty output path")
+	}
+	if err := session.CaptureFrame(-1, "frame.jpg"); err == nil {
+		t.Fatal("CaptureFrame returned nil error for a negative warmup")
+	}
+	if err := session.CaptureFrame(0, "frame.jpg"); err == nil {
+		t.Fatal("CaptureFrame returned nil error for a closed session")
+	}
+}

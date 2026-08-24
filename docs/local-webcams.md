@@ -74,6 +74,40 @@ The status table shows raw UVC ranges: pan and tilt use arcseconds, while zoom u
 
 PTZ requires a cgo-enabled macOS build and a directly attached USB UVC camera with absolute controls. Built-in cameras, Studio Display cameras, Continuity Camera, and devices that do not expose UVC PTZ controls return a named unsupported-camera error.
 
+## Capture a pan sweep
+
+`camsnap sweep` moves an absolute-pan/tilt USB camera through evenly spaced positions and captures a JPEG at each stop. It keeps one native AVFoundation session streaming throughout the entire sweep, including movement, fresh-connection verification, and frame capture:
+
+```sh
+camsnap sweep --device 0 --from -45 --to 45 --steps 7 --out-dir panorama
+camsnap sweep desk --from -60 --to 60 --steps 9 --tilt -5 \
+  --settle 3s --timeout 6s --out-dir desk-panorama --json
+camsnap sweep --device 0 --from 30 --to -30 --steps 5 \
+  --out-dir reverse-panorama --fail-fast
+```
+
+The start and end positions are clamped and snapped to the camera's reported pan range and resolution. `--tilt` sets a fixed, clamped tilt for every frame; when omitted, the sweep preserves the current tilt. `--steps` must be at least two and includes both endpoints. `--warmup` applies once before the first frame; `--video-size` and `--framerate` follow the existing native-snapshot behavior. Sweeps require the native backend because ffmpeg cannot capture from the same already-open AVFoundation stream.
+
+Each output directory contains stable names such as `step-000-pan--45.000.jpg` and `manifest.json`. The manifest includes the selected device, effective start/end/tilt angles, requested step count, and one entry per captured frame:
+
+```json
+{
+  "index": 0,
+  "requested": {
+    "pan": { "degrees": -45, "raw": -162000 },
+    "tilt": { "degrees": -5, "raw": -18000 }
+  },
+  "observed": {
+    "pan": { "degrees": -45, "raw": -162000 },
+    "tilt": { "degrees": -5, "raw": -18000 }
+  },
+  "frame_path": "panorama/step-000-pan--45.000.jpg",
+  "verified": true
+}
+```
+
+A position that misses the camera's reported control resolution is still photographed and recorded with `"verified": false` and a `verification_error`. By default the remaining steps continue, then the command exits non-zero and names the failed step indices. `--fail-fast` stops after capturing the first failed step and still writes the partial manifest. `--json` prints the exact same manifest bytes that are saved to disk.
+
 ## Building the native backend
 
 `make build` embeds the Camera usage-description plist and applies an ad-hoc signature. Set `CAMSNAP_CODESIGN_IDENTITY` to use a local Developer ID identity instead.
