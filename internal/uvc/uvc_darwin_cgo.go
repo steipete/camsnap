@@ -17,6 +17,24 @@ import (
 	"unsafe"
 )
 
+// UVC camera terminal control selectors (UVC 1.5, table A-12).
+const (
+	selZoomAbsolute    = 0x0B
+	selZoomRelative    = 0x0C
+	selPanTiltAbsolute = 0x0D
+	selPanTiltRelative = 0x0E
+)
+
+// UVC class-specific request codes (UVC 1.5, table A-8).
+const (
+	reqSetCur = 0x01
+	reqGetCur = 0x81
+	reqGetMin = 0x82
+	reqGetMax = 0x83
+	reqGetRes = 0x84
+	reqGetDef = 0x87
+)
+
 // Controller controls the camera terminal of one USB UVC device.
 type Controller struct {
 	mu           sync.Mutex
