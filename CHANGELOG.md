@@ -1,7 +1,10 @@
 # Changelog
 
-## 0.4.1 - Unreleased
-- Keep UVC PTZ cameras streaming during control, verify settled positions through fresh connections, and add configurable motion timing.
+## 0.4.1 - 2026-08-24
+- Fix `ptz goto`, `move`, and `home` reporting success for movements the camera never performed.
+- Keep UVC PTZ cameras streaming during control and verify settled positions through a fresh control connection.
+- Add `--settle` and `--timeout` to the PTZ motion commands; `ptz` now requires macOS Camera permission.
+- Constrain the Objective-C bridges to darwin cgo builds and move darwin-only UVC constants into the cgo implementation, fixing Linux lint.
 
 ## 0.4.0 - 2026-08-06
 - Add pan, tilt, zoom, status, and home controls for UVC USB cameras on macOS.
