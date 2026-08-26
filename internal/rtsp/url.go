@@ -19,10 +19,21 @@ func BuildURL(cam config.Camera) (string, error) {
 		return "", fmt.Errorf("host is required")
 	}
 
-	if !strings.Contains(host, ":") && cam.Port != 0 {
-		host = net.JoinHostPort(host, fmt.Sprintf("%d", cam.Port))
-	} else if !strings.Contains(host, ":") {
-		host = net.JoinHostPort(host, fmt.Sprintf("%d", defaultPort))
+	// A bare IP literal (v4 or v6) always needs JoinHostPort -- IPv6
+	// literals contain internal colons (e.g. "fe80::1"), which the old
+	// `!strings.Contains(host, ":")` check mistook for an already-complete
+	// "host:port" (or "[host]:port") authority and left untouched,
+	// producing an unbracketed, portless RTSP authority. net.ParseIP
+	// distinguishes a bare literal from an authority that already carries
+	// a port (net.ParseIP fails on "1.2.3.4:554" and on "[fe80::1]:554"
+	// alike, since neither is a valid bare IP string), and
+	// net.JoinHostPort brackets IPv6 automatically.
+	if net.ParseIP(host) != nil || !strings.Contains(host, ":") {
+		port := cam.Port
+		if port == 0 {
+			port = defaultPort
+		}
+		host = net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	}
 
 	userInfo := ""

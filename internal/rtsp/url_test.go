@@ -81,3 +81,70 @@ func TestReplacePath(t *testing.T) {
 		t.Fatalf("ReplacePath empty = %q, want %q", got, base)
 	}
 }
+
+// TestBuildURLBareIPv6 is a regression test: a bare IPv6 literal (as
+// internal/cli.hostOnly now suggests for ONVIF-discovered devices) must be
+// bracketed and get a port, exactly like a bare IPv4 literal or hostname.
+// Before the fix, `strings.Contains(host, ":")` treated any IPv6 literal's
+// internal colons as "already has a port" and left it untouched, producing
+// an unbracketed, portless, unusable RTSP authority.
+func TestBuildURLBareIPv6(t *testing.T) {
+	cases := []struct {
+		name string
+		cam  config.Camera
+		want string
+	}{
+		{
+			name: "default port",
+			cam:  config.Camera{Host: "fe80::20c:29ff:fe37:3729"},
+			want: "rtsp://[fe80::20c:29ff:fe37:3729]:554/stream1",
+		},
+		{
+			name: "configured port",
+			cam:  config.Camera{Host: "fe80::1", Port: 8554},
+			want: "rtsp://[fe80::1]:8554/stream1",
+		},
+		{
+			name: "with auth",
+			cam:  config.Camera{Host: "fe80::1", Port: 554, Username: "u", Password: "p"},
+			want: "rtsp://u:p@[fe80::1]:554/stream1",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := BuildURL(tc.cam)
+			if err != nil {
+				t.Fatalf("BuildURL: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestBuildURLAlreadyCompleteAuthorityUnchanged confirms the fix does not
+// disturb hosts that already carry their own port (IPv4:port or the
+// bracketed [IPv6]:port form) -- those must pass through untouched, same
+// as before this fix.
+func TestBuildURLAlreadyCompleteAuthorityUnchanged(t *testing.T) {
+	cases := []struct {
+		name string
+		host string
+	}{
+		{"ipv4 with port", "192.168.1.50:8080"},
+		{"bracketed ipv6 with port", "[fe80::1]:8080"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := BuildURL(config.Camera{Host: tc.host})
+			if err != nil {
+				t.Fatalf("BuildURL: %v", err)
+			}
+			want := "rtsp://" + tc.host + "/stream1"
+			if got != want {
+				t.Fatalf("got %s, want %s", got, want)
+			}
+		})
+	}
+}
