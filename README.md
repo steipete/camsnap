@@ -141,7 +141,7 @@ See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Ca
 
 ## Development
 
-Source builds require Go 1.26 or newer and `ffmpeg` on `PATH`.
+Source builds require Go 1.27 or newer and `ffmpeg` on `PATH`.
 
 ```sh
 make build

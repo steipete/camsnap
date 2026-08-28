@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.4.2 - Unreleased
+- Refresh Go dependencies, switch YAML v3 to its maintained module, and update the Go build baseline to 1.27 and setup-go to v7.
 - Add native single-session PTZ pan sweeps with verified frames, requested-versus-observed JSON manifests, and optional fail-fast handling.
 
 ## 0.4.1 - 2026-08-24
