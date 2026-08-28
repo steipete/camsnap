@@ -109,6 +109,18 @@ func TestBuildURLBareIPv6(t *testing.T) {
 			cam:  config.Camera{Host: "fe80::1", Port: 554, Username: "u", Password: "p"},
 			want: "rtsp://u:p@[fe80::1]:554/stream1",
 		},
+		{
+			// net.ParseIP rejects zone IDs, so this used to skip JoinHostPort
+			// and emit rtsp://fe80::1%en0/stream1 (unbracketed, portless).
+			name: "zone-qualified link-local",
+			cam:  config.Camera{Host: "fe80::1%en0"},
+			want: "rtsp://[fe80::1%en0]:554/stream1",
+		},
+		{
+			name: "zone-qualified with configured port",
+			cam:  config.Camera{Host: "fe80::1%en0", Port: 8554},
+			want: "rtsp://[fe80::1%en0]:8554/stream1",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -125,8 +137,8 @@ func TestBuildURLBareIPv6(t *testing.T) {
 
 // TestBuildURLAlreadyCompleteAuthorityUnchanged confirms the fix does not
 // disturb hosts that already carry their own port (IPv4:port or the
-// bracketed [IPv6]:port form) -- those must pass through untouched, same
-// as before this fix.
+// bracketed [IPv6]:port form, including a zone identifier) -- those must
+// pass through untouched, same as before this fix.
 func TestBuildURLAlreadyCompleteAuthorityUnchanged(t *testing.T) {
 	cases := []struct {
 		name string
@@ -134,6 +146,7 @@ func TestBuildURLAlreadyCompleteAuthorityUnchanged(t *testing.T) {
 	}{
 		{"ipv4 with port", "192.168.1.50:8080"},
 		{"bracketed ipv6 with port", "[fe80::1]:8080"},
+		{"bracketed zone-qualified ipv6 with port", "[fe80::1%en0]:8080"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,6 +1,11 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/steipete/camsnap/internal/config"
+	"github.com/steipete/camsnap/internal/rtsp"
+)
 
 func TestHostOnly(t *testing.T) {
 	cases := []struct {
@@ -10,6 +15,7 @@ func TestHostOnly(t *testing.T) {
 	}{
 		{"ipv4 with port", "192.168.0.177:80", "192.168.0.177"},
 		{"ipv6 bracketed with port", "[fe80::20c:29ff:fe37:3729]:80", "fe80::20c:29ff:fe37:3729"},
+		{"zone-qualified ipv6 bracketed with port", "[fe80::1%en0]:80", "fe80::1%en0"},
 		{"no port falls back verbatim", "192.168.0.177", "192.168.0.177"},
 	}
 	for _, tc := range cases {
@@ -29,6 +35,7 @@ func TestSafeName(t *testing.T) {
 	}{
 		{"ipv4 has no colons", "192.168.0.177", "192.168.0.177"},
 		{"ipv6 internal colons become dashes", "fe80::20c:29ff:fe37:3729", "fe80--20c-29ff-fe37-3729"},
+		{"zone-qualified ipv6 keeps zone", "fe80::1%en0", "fe80--1%en0"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -68,6 +75,12 @@ func TestDiscoverSuggestedCommandIsAddable(t *testing.T) {
 			wantHost:     "fe80::20c:29ff:fe37:3729",
 			wantNameTail: "fe80--20c-29ff-fe37-3729",
 		},
+		{
+			name:         "zone-qualified ipv6 link-local onvif device",
+			deviceHost:   "[fe80::1%en0]:80",
+			wantHost:     "fe80::1%en0",
+			wantNameTail: "fe80--1%en0",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,5 +93,22 @@ func TestDiscoverSuggestedCommandIsAddable(t *testing.T) {
 				t.Errorf("safeName(hostOnly(%q)) = %q, want %q", tc.deviceHost, nameTail, tc.wantNameTail)
 			}
 		})
+	}
+}
+
+// TestDiscoverScopedIPv6HostBuildsRTSPURL is the discover → add → BuildURL
+// path for a zone-qualified link-local XAddr. hostOnly strips the ONVIF
+// port and leaves "fe80::1%en0"; BuildURL must still JoinHostPort that
+// (net.ParseIP rejects the zone, so the previous check skipped it).
+func TestDiscoverScopedIPv6HostBuildsRTSPURL(t *testing.T) {
+	deviceHost := "[fe80::1%en0]:80"
+	host := hostOnly(deviceHost)
+	got, err := rtsp.BuildURL(config.Camera{Host: host})
+	if err != nil {
+		t.Fatalf("BuildURL: %v", err)
+	}
+	want := "rtsp://[fe80::1%en0]:554/stream1"
+	if got != want {
+		t.Fatalf("hostOnly(%q) then BuildURL = %q, want %q", deviceHost, got, want)
 	}
 }
