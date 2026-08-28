@@ -3,8 +3,60 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
+
+func TestLoadExistingYAMLConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	data := `cameras:
+  - name: front
+    host: 192.168.1.10
+    port: 554
+    protocol: rtsp
+    username: user
+    password: pass
+    path: /camera/stream
+    rtsp_transport: udp
+    stream: stream2
+    rtsp_client: gortsplib
+    no_audio: yes
+    audio_codec: aac
+  - name: laptop
+    protocol: local
+    device: "0"
+    local_backend: native
+`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	want := []Camera{
+		{
+			Name: "front", Host: "192.168.1.10", Port: 554, Protocol: "rtsp",
+			Username: "user", Password: "pass", Path: "/camera/stream",
+			RTSPTransport: "udp", Stream: "stream2", RTSPClient: "gortsplib",
+			NoAudio: true, AudioCodec: "aac",
+		},
+		{Name: "laptop", Protocol: "local", Device: "0", LocalBackend: "native"},
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Cameras, want) {
+		t.Fatalf("loaded cameras = %#v, want %#v", cfg.Cameras, want)
+	}
+	if err := Save(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Cameras, want) {
+		t.Fatalf("saved cameras = %#v, want %#v", cfg.Cameras, want)
+	}
+}
 
 func TestSaveLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
