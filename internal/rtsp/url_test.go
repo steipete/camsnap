@@ -174,7 +174,7 @@ func TestBuildURLAlreadyCompleteAuthorityUnchanged(t *testing.T) {
 // rejected as an invalid percent-escape, and the native client never starts.
 func TestBuildURLScopedIPv6AcceptedByGortsplib(t *testing.T) {
 	if _, err := base.ParseURL("rtsp://[fe80::1%en0]:554/stream1"); err == nil {
-		t.Fatal("gortsplib base.ParseURL unexpectedly accepted raw %en0")
+		t.Fatal("gortsplib base.ParseURL unexpectedly accepted an unencoded zone delimiter")
 	}
 
 	cases := []config.Camera{
