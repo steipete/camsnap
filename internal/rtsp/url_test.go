@@ -3,6 +3,7 @@ package rtsp
 import (
 	"testing"
 
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
 	"github.com/steipete/camsnap/internal/config"
 )
 
@@ -110,16 +111,21 @@ func TestBuildURLBareIPv6(t *testing.T) {
 			want: "rtsp://u:p@[fe80::1]:554/stream1",
 		},
 		{
-			// net.ParseIP rejects zone IDs, so this used to skip JoinHostPort
-			// and emit rtsp://fe80::1%en0/stream1 (unbracketed, portless).
+			// RFC 6874: the zone delimiter is "%25" in a URI. A raw "%en0"
+			// is an invalid percent-escape (gortsplib base.ParseURL rejects it).
 			name: "zone-qualified link-local",
 			cam:  config.Camera{Host: "fe80::1%en0"},
-			want: "rtsp://[fe80::1%en0]:554/stream1",
+			want: "rtsp://[fe80::1%25en0]:554/stream1",
 		},
 		{
 			name: "zone-qualified with configured port",
 			cam:  config.Camera{Host: "fe80::1%en0", Port: 8554},
-			want: "rtsp://[fe80::1%en0]:8554/stream1",
+			want: "rtsp://[fe80::1%25en0]:8554/stream1",
+		},
+		{
+			name: "zone-qualified with auth",
+			cam:  config.Camera{Host: "fe80::1%en0", Username: "u", Password: "p"},
+			want: "rtsp://u:p@[fe80::1%25en0]:554/stream1",
 		},
 	}
 	for _, tc := range cases {
@@ -135,18 +141,19 @@ func TestBuildURLBareIPv6(t *testing.T) {
 	}
 }
 
-// TestBuildURLAlreadyCompleteAuthorityUnchanged confirms the fix does not
-// disturb hosts that already carry their own port (IPv4:port or the
-// bracketed [IPv6]:port form, including a zone identifier) -- those must
-// pass through untouched, same as before this fix.
+// TestBuildURLAlreadyCompleteAuthorityUnchanged confirms hosts that already
+// carry their own port (IPv4:port or bracketed [IPv6]:port) pass through
+// as the authority. A zone identifier is RFC 6874-encoded ("%25") in the
+// URI; the port and brackets are otherwise unchanged.
 func TestBuildURLAlreadyCompleteAuthorityUnchanged(t *testing.T) {
 	cases := []struct {
 		name string
 		host string
+		want string
 	}{
-		{"ipv4 with port", "192.168.1.50:8080"},
-		{"bracketed ipv6 with port", "[fe80::1]:8080"},
-		{"bracketed zone-qualified ipv6 with port", "[fe80::1%en0]:8080"},
+		{"ipv4 with port", "192.168.1.50:8080", "rtsp://192.168.1.50:8080/stream1"},
+		{"bracketed ipv6 with port", "[fe80::1]:8080", "rtsp://[fe80::1]:8080/stream1"},
+		{"bracketed zone-qualified ipv6 with port", "[fe80::1%en0]:8080", "rtsp://[fe80::1%25en0]:8080/stream1"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -154,10 +161,35 @@ func TestBuildURLAlreadyCompleteAuthorityUnchanged(t *testing.T) {
 			if err != nil {
 				t.Fatalf("BuildURL: %v", err)
 			}
-			want := "rtsp://" + tc.host + "/stream1"
-			if got != want {
-				t.Fatalf("got %s, want %s", got, want)
+			if got != tc.want {
+				t.Fatalf("got %s, want %s", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestBuildURLScopedIPv6AcceptedByGortsplib is the required parser proof:
+// a zone-qualified host must serialize as RFC 6874 ("%25") so gortsplib
+// base.ParseURL accepts it. The raw JoinHostPort spelling ("%en0") is
+// rejected as an invalid percent-escape, and the native client never starts.
+func TestBuildURLScopedIPv6AcceptedByGortsplib(t *testing.T) {
+	if _, err := base.ParseURL("rtsp://[fe80::1%en0]:554/stream1"); err == nil {
+		t.Fatal("gortsplib base.ParseURL unexpectedly accepted raw %en0")
+	}
+
+	cases := []config.Camera{
+		{Host: "fe80::1%en0"},
+		{Host: "fe80::1%en0", Port: 8554},
+		{Host: "fe80::1%en0", Username: "u", Password: "p"},
+		{Host: "[fe80::1%en0]:8080"},
+	}
+	for _, cam := range cases {
+		got, err := BuildURL(cam)
+		if err != nil {
+			t.Fatalf("BuildURL(%+v): %v", cam, err)
+		}
+		if _, err := base.ParseURL(got); err != nil {
+			t.Fatalf("gortsplib base.ParseURL(%q): %v", got, err)
+		}
 	}
 }

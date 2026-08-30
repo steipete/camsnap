@@ -98,8 +98,8 @@ func TestDiscoverSuggestedCommandIsAddable(t *testing.T) {
 
 // TestDiscoverScopedIPv6HostBuildsRTSPURL is the discover → add → BuildURL
 // path for a zone-qualified link-local XAddr. hostOnly strips the ONVIF
-// port and leaves "fe80::1%en0"; BuildURL must still JoinHostPort that
-// (net.ParseIP rejects the zone, so the previous check skipped it).
+// port and leaves "fe80::1%en0"; BuildURL must JoinHostPort that host and
+// emit the RFC 6874 zone ("%25") so the URL is parseable.
 func TestDiscoverScopedIPv6HostBuildsRTSPURL(t *testing.T) {
 	deviceHost := "[fe80::1%en0]:80"
 	host := hostOnly(deviceHost)
@@ -107,7 +107,7 @@ func TestDiscoverScopedIPv6HostBuildsRTSPURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildURL: %v", err)
 	}
-	want := "rtsp://[fe80::1%en0]:554/stream1"
+	want := "rtsp://[fe80::1%25en0]:554/stream1"
 	if got != want {
 		t.Fatalf("hostOnly(%q) then BuildURL = %q, want %q", deviceHost, got, want)
 	}

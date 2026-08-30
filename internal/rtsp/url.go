@@ -31,7 +31,9 @@ func BuildURL(cam config.Camera) (string, error) {
 	// "[fe80::1]:554" alike). Unlike net.ParseIP, it also accepts a
 	// zone-qualified IPv6 literal such as "fe80::1%en0", which
 	// hostOnly returns from a discovered "[fe80::1%en0]:80".
-	// net.JoinHostPort brackets IPv6 (including the zone) automatically.
+	// net.JoinHostPort brackets IPv6 (including the zone) automatically;
+	// RFC 6874 percent-encoding of the zone is applied when serializing
+	// the URL, not here.
 	if _, err := netip.ParseAddr(host); err == nil || !strings.Contains(host, ":") {
 		port := cam.Port
 		if port == 0 {
@@ -40,12 +42,12 @@ func BuildURL(cam config.Camera) (string, error) {
 		host = net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	}
 
-	userInfo := ""
+	var user *url.Userinfo
 	if cam.Username != "" {
 		if cam.Password != "" {
-			userInfo = url.UserPassword(cam.Username, cam.Password).String()
+			user = url.UserPassword(cam.Username, cam.Password)
 		} else {
-			userInfo = url.User(cam.Username).String()
+			user = url.User(cam.Username)
 		}
 	}
 
@@ -60,11 +62,6 @@ func BuildURL(cam config.Camera) (string, error) {
 		return "", fmt.Errorf("unsupported protocol %q", proto)
 	}
 
-	authority := host
-	if userInfo != "" {
-		authority = userInfo + "@" + host
-	}
-
 	path := cam.Path
 	if path == "" {
 		// Default to /stream1 as the main Tapo stream.
@@ -74,7 +71,17 @@ func BuildURL(cam config.Camera) (string, error) {
 		path = "/" + path
 	}
 
-	return fmt.Sprintf("%s://%s%s", proto, authority, path), nil
+	// url.URL.Host is the decoded authority (JoinHostPort's "[fe80::1%en0]:554"
+	// form). String() applies RFC 6874 and emits "%25" for the zone delimiter,
+	// which gortsplib's base.ParseURL and net/url accept. A raw "%en0" in the
+	// concatenated string is an invalid percent-escape.
+	// Normalize an already-encoded "%25" so String() does not double-escape.
+	return (&url.URL{
+		Scheme: proto,
+		User:   user,
+		Host:   strings.Replace(host, "%25", "%", 1),
+		Path:   path,
+	}).String(), nil
 }
 
 // ReplacePath replaces the trailing path segment of an RTSP URL.
