@@ -4,6 +4,7 @@ package rtsp
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"strings"
 
@@ -19,18 +20,33 @@ func BuildURL(cam config.Camera) (string, error) {
 		return "", fmt.Errorf("host is required")
 	}
 
-	if !strings.Contains(host, ":") && cam.Port != 0 {
-		host = net.JoinHostPort(host, fmt.Sprintf("%d", cam.Port))
-	} else if !strings.Contains(host, ":") {
-		host = net.JoinHostPort(host, fmt.Sprintf("%d", defaultPort))
+	// Released configs can contain bracketed authorities with URI-escaped
+	// scopes. Decode those once; bare address literals always use raw scopes.
+	if strings.HasPrefix(host, "[") {
+		if parsed, err := url.Parse("rtsp://" + host); err == nil {
+			if addr, err := netip.ParseAddr(parsed.Hostname()); err == nil && addr.Zone() != "" {
+				host = parsed.Host
+			}
+		}
+	}
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = host[1 : len(host)-1]
+	}
+	// Address colons and scope IDs do not mean the host already has a port.
+	if _, err := netip.ParseAddr(host); err == nil || !strings.Contains(host, ":") {
+		port := cam.Port
+		if port == 0 {
+			port = defaultPort
+		}
+		host = net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	}
 
-	userInfo := ""
+	var user *url.Userinfo
 	if cam.Username != "" {
 		if cam.Password != "" {
-			userInfo = url.UserPassword(cam.Username, cam.Password).String()
+			user = url.UserPassword(cam.Username, cam.Password)
 		} else {
-			userInfo = url.User(cam.Username).String()
+			user = url.User(cam.Username)
 		}
 	}
 
@@ -45,11 +61,6 @@ func BuildURL(cam config.Camera) (string, error) {
 		return "", fmt.Errorf("unsupported protocol %q", proto)
 	}
 
-	authority := host
-	if userInfo != "" {
-		authority = userInfo + "@" + host
-	}
-
 	path := cam.Path
 	if path == "" {
 		// Default to /stream1 as the main Tapo stream.
@@ -59,7 +70,13 @@ func BuildURL(cam config.Camera) (string, error) {
 		path = "/" + path
 	}
 
-	return fmt.Sprintf("%s://%s%s", proto, authority, path), nil
+	// Escape the authority's raw IPv6 scope, but preserve released custom-path
+	// bytes, including query separators and existing percent escapes.
+	return (&url.URL{
+		Scheme: proto,
+		User:   user,
+		Host:   host,
+	}).String() + path, nil
 }
 
 // ReplacePath replaces the trailing path segment of an RTSP URL.

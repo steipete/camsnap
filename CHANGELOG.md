@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.4.2 - Unreleased
+- Fix ONVIF discovery suggestions using the service port as the RTSP host, and support bare and scoped IPv6 camera hosts while preserving custom RTSP paths. Thanks @twidtwid (#15).
 - Refresh Go dependencies, switch YAML v3 to its maintained module, and update the Go build baseline to 1.27 and setup-go to v7.
 - Add native single-session PTZ pan sweeps with verified frames, requested-versus-observed JSON manifests, and optional fail-fast handling.
 
