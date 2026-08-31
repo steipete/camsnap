@@ -1,114 +1,52 @@
 package cli
 
 import (
+	"bytes"
+	"path/filepath"
 	"testing"
 
 	"github.com/steipete/camsnap/internal/config"
 	"github.com/steipete/camsnap/internal/rtsp"
 )
 
-func TestHostOnly(t *testing.T) {
+func TestDiscoverSuggestedHostCanBeSaved(t *testing.T) {
 	cases := []struct {
-		name string
-		in   string
-		want string
+		name, deviceHost, wantHost, wantName, wantURL string
 	}{
-		{"ipv4 with port", "192.168.0.177:80", "192.168.0.177"},
-		{"ipv6 bracketed with port", "[fe80::20c:29ff:fe37:3729]:80", "fe80::20c:29ff:fe37:3729"},
-		{"zone-qualified ipv6 bracketed with port", "[fe80::1%en0]:80", "fe80::1%en0"},
-		{"no port falls back verbatim", "192.168.0.177", "192.168.0.177"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := hostOnly(tc.in); got != tc.want {
-				t.Errorf("hostOnly(%q) = %q, want %q", tc.in, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestSafeName(t *testing.T) {
-	cases := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{"ipv4 has no colons", "192.168.0.177", "192.168.0.177"},
-		{"ipv6 internal colons become dashes", "fe80::20c:29ff:fe37:3729", "fe80--20c-29ff-fe37-3729"},
-		{"zone-qualified ipv6 keeps zone", "fe80::1%en0", "fe80--1%en0"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := safeName(tc.in); got != tc.want {
-				t.Errorf("safeName(%q) = %q, want %q", tc.in, got, tc.want)
-			}
-		})
-	}
-}
-
-// TestDiscoverSuggestedCommandIsAddable is a regression test for the bug
-// this file fixes: before the fix, the suggested `add` command for an
-// ONVIF-discovered device embedded the discovery (ONVIF/SOAP) port into
-// --host verbatim, which `add` stores as a literal, malformed host string
-// (its own --port flag, defaulting to RTSP's 554, is a separate field) --
-// and for bracketed IPv6 addresses, the generated --name was truncated at
-// the address's first internal colon (e.g. "cam-[fe80"), an invalid,
-// unusable name. Both symptoms trace to the same root cause: treating the
-// discovery Device.Host ("host:port" from the ONVIF XAddr) as if it were
-// already the bare host `add` expects.
-func TestDiscoverSuggestedCommandIsAddable(t *testing.T) {
-	cases := []struct {
-		name         string
-		deviceHost   string // discovery.Device.Host: "host:port" from XAddr
-		wantHost     string // what should go after --host in the suggestion
-		wantNameTail string // what should go after "cam-" in --name
-	}{
-		{
-			name:         "ipv4 onvif device",
-			deviceHost:   "192.168.0.177:80",
-			wantHost:     "192.168.0.177",
-			wantNameTail: "192.168.0.177",
-		},
-		{
-			name:         "ipv6 link-local onvif device",
-			deviceHost:   "[fe80::20c:29ff:fe37:3729]:80",
-			wantHost:     "fe80::20c:29ff:fe37:3729",
-			wantNameTail: "fe80--20c-29ff-fe37-3729",
-		},
-		{
-			name:         "zone-qualified ipv6 link-local onvif device",
-			deviceHost:   "[fe80::1%en0]:80",
-			wantHost:     "fe80::1%en0",
-			wantNameTail: "fe80--1%en0",
-		},
+		{"ipv4 with ONVIF port", "192.0.2.1:80", "192.0.2.1", "cam-192.0.2.1", "rtsp://192.0.2.1:554/stream1"},
+		{"ipv4 without port", "192.0.2.1", "192.0.2.1", "cam-192.0.2.1", "rtsp://192.0.2.1:554/stream1"},
+		{"hostname", "camera.example:8080", "camera.example", "cam-camera.example", "rtsp://camera.example:554/stream1"},
+		{"ipv6 with ONVIF port", "[2001:db8::1]:80", "2001:db8::1", "cam-2001-db8--1", "rtsp://[2001:db8::1]:554/stream1"},
+		{"ipv6 without port", "[2001:db8::1]", "2001:db8::1", "cam-2001-db8--1", "rtsp://[2001:db8::1]:554/stream1"},
+		{"scoped ipv6", "[fe80::1%en0]:80", "fe80::1%en0", "cam-fe80--1%en0", "rtsp://[fe80::1%25en0]:554/stream1"},
+		{"scoped ipv6 without port", "[fe80::1%en0]", "fe80::1%en0", "cam-fe80--1%en0", "rtsp://[fe80::1%25en0]:554/stream1"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			host := hostOnly(tc.deviceHost)
-			if host != tc.wantHost {
-				t.Errorf("hostOnly(%q) = %q, want %q", tc.deviceHost, host, tc.wantHost)
+			name := "cam-" + safeName(host)
+			if host != tc.wantHost || name != tc.wantName {
+				t.Fatalf("suggestion host/name = %q/%q, want %q/%q", host, name, tc.wantHost, tc.wantName)
 			}
-			nameTail := safeName(host)
-			if nameTail != tc.wantNameTail {
-				t.Errorf("safeName(hostOnly(%q)) = %q, want %q", tc.deviceHost, nameTail, tc.wantNameTail)
+			cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+			cmd := NewRootCommand("test")
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetArgs([]string{"--config", cfgPath, "add", "--name", name, "--host", host})
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := config.Load(cfgPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cam, found := config.FindCamera(cfg, name)
+			if !found || cam.Host != tc.wantHost || cam.Port != 554 {
+				t.Fatalf("saved camera = %+v, found = %v", cam, found)
+			}
+			got, err := rtsp.BuildURL(cam)
+			if err != nil || got != tc.wantURL {
+				t.Fatalf("BuildURL = %q, %v; want %q", got, err, tc.wantURL)
 			}
 		})
-	}
-}
-
-// TestDiscoverScopedIPv6HostBuildsRTSPURL is the discover → add → BuildURL
-// path for a zone-qualified link-local XAddr. hostOnly strips the ONVIF
-// port and leaves "fe80::1%en0"; BuildURL must JoinHostPort that host and
-// emit the RFC 6874 zone ("%25") so the URL is parseable.
-func TestDiscoverScopedIPv6HostBuildsRTSPURL(t *testing.T) {
-	deviceHost := "[fe80::1%en0]:80"
-	host := hostOnly(deviceHost)
-	got, err := rtsp.BuildURL(config.Camera{Host: host})
-	if err != nil {
-		t.Fatalf("BuildURL: %v", err)
-	}
-	want := "rtsp://[fe80::1%25en0]:554/stream1"
-	if got != want {
-		t.Fatalf("hostOnly(%q) then BuildURL = %q, want %q", deviceHost, got, want)
 	}
 }

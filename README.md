@@ -63,6 +63,7 @@ camsnap stores configuration in `~/.config/camsnap/config.yaml`, or `$XDG_CONFIG
 | `discover` | Find ONVIF devices on the local network. |
 | `devices` | List local video inputs. |
 | `ptz` | Control pan, tilt, and zoom on supported USB webcams. |
+| `sweep` | Capture verified frames across a local PTZ camera's pan arc. |
 | `doctor` | Check `ffmpeg`, connectivity, and optional capture probes. |
 
 Run `camsnap <command> --help` for the complete flags and defaults.
@@ -119,9 +120,15 @@ camsnap ptz status --device 0
 camsnap ptz goto --device 0 --pan 12.5 --tilt -5 --zoom 50
 camsnap ptz move --device 0 --pan -10 --zoom 5
 camsnap ptz home --device 0
+camsnap ptz goto --device 0 --pan 45 --settle 3s --timeout 6s
+camsnap sweep --device 0 --from -45 --to 45 --steps 7 --out-dir panorama
 ```
 
-See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Camera permission behavior, UVC PTZ control, Linux device paths, and backend selection.
+PTZ commands keep the selected camera streaming while reading or changing its position, so they require macOS Camera permission. Motion commands verify the observed position after `--settle` (default `2s`) and fail if it does not stabilize before `--timeout` (default `5s`).
+
+`sweep` keeps one native capture session open across the entire arc and writes numbered JPEG frames plus `manifest.json`. The manifest records requested and observed pan/tilt for each frame; failed positions are retained and reported with a non-zero exit status. Add `--fail-fast` to stop after the first failed position, or `--json` to print the manifest.
+
+See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Camera permission behavior, UVC PTZ control and sweeps, Linux device paths, and backend selection.
 
 ## Platform support
 
@@ -134,7 +141,7 @@ See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Ca
 
 ## Development
 
-Source builds require Go 1.26 or newer and `ffmpeg` on `PATH`.
+Source builds require Go 1.27 or newer and `ffmpeg` on `PATH`.
 
 ```sh
 make build

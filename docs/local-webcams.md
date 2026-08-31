@@ -61,13 +61,52 @@ camsnap ptz status --device 0
 camsnap ptz goto --device 0 --pan 12.5 --tilt -5 --zoom 50
 camsnap ptz move --device 0 --pan -10 --zoom 5
 camsnap ptz home --device 0
+camsnap ptz goto --device 0 --pan 45 --settle 3s --timeout 6s
 ```
 
-`goto` uses absolute pan and tilt angles in degrees and zoom from 0–100 percent. `move` takes degree deltas and zoom percentage-point deltas. Values are clamped and snapped to the ranges reported by the camera, and the command prints the positions actually applied. `home` uses each control's UVC default, falling back to zero pan/tilt and minimum zoom when a device does not report defaults. Every subcommand supports `--json`.
+Some gimbal webcams service UVC controls only while their video stream is active: without a stream, position reads can be stale and accepted movement commands can be silently ignored. Every `ptz` subcommand starts a temporary AVFoundation capture session before accessing UVC, keeps the stream active throughout the operation, and stops it afterward without saving a frame. This requires the same macOS Camera permission as native snapshots.
+
+`goto` uses absolute pan and tilt angles in degrees and zoom from 0–100 percent. `move` takes degree deltas and zoom percentage-point deltas. Values are clamped and snapped to the ranges reported by the camera, and the command prints the observed positions after they stabilize. `home` uses each control's UVC default, falling back to zero pan/tilt and minimum zoom when a device does not report defaults. Every subcommand supports `--json`.
+
+The motion commands accept `--settle` (default `2s`) to give the gimbal time to reach its target and `--timeout` (default `5s`) for the overall verification wait. Verification uses a fresh UVC connection that never issued the movement command, because the original connection can echo an uncommitted setpoint even when the camera did not move. If the observed position differs from the requested target by more than the camera's reported control resolution, the command fails. Confirm that the camera can stream and disable any on-camera AI framing or tracking that overrides manual positioning before retrying.
 
 The status table shows raw UVC ranges: pan and tilt use arcseconds, while zoom units are device-specific. Relative moves are implemented as a current-position read followed by a clamped absolute write because native UVC relative-speed controls vary between devices.
 
 PTZ requires a cgo-enabled macOS build and a directly attached USB UVC camera with absolute controls. Built-in cameras, Studio Display cameras, Continuity Camera, and devices that do not expose UVC PTZ controls return a named unsupported-camera error.
+
+## Capture a pan sweep
+
+`camsnap sweep` moves an absolute-pan/tilt USB camera through evenly spaced positions and captures a JPEG at each stop. It keeps one native AVFoundation session streaming throughout the entire sweep, including movement, fresh-connection verification, and frame capture:
+
+```sh
+camsnap sweep --device 0 --from -45 --to 45 --steps 7 --out-dir panorama
+camsnap sweep desk --from -60 --to 60 --steps 9 --tilt -5 \
+  --settle 3s --timeout 6s --out-dir desk-panorama --json
+camsnap sweep --device 0 --from 30 --to -30 --steps 5 \
+  --out-dir reverse-panorama --fail-fast
+```
+
+The start and end positions are clamped and snapped to the camera's reported pan range and resolution. `--tilt` sets a fixed, clamped tilt for every frame; when omitted, the sweep preserves the current tilt. `--steps` must be at least two and includes both endpoints. `--warmup` applies once before the first frame; `--video-size` and `--framerate` follow the existing native-snapshot behavior. Sweeps require the native backend because ffmpeg cannot capture from the same already-open AVFoundation stream.
+
+Each output directory contains stable names such as `step-000-pan--45.000.jpg` and `manifest.json`. The manifest includes the selected device, effective start/end/tilt angles, requested step count, and one entry per captured frame:
+
+```json
+{
+  "index": 0,
+  "requested": {
+    "pan": { "degrees": -45, "raw": -162000 },
+    "tilt": { "degrees": -5, "raw": -18000 }
+  },
+  "observed": {
+    "pan": { "degrees": -45, "raw": -162000 },
+    "tilt": { "degrees": -5, "raw": -18000 }
+  },
+  "frame_path": "panorama/step-000-pan--45.000.jpg",
+  "verified": true
+}
+```
+
+A position that misses the camera's reported control resolution is still photographed and recorded with `"verified": false` and a `verification_error`. By default the remaining steps continue, then the command exits non-zero and names the failed step indices. `--fail-fast` stops after capturing the first failed step and still writes the partial manifest. `--json` prints the exact same manifest bytes that are saved to disk.
 
 ## Building the native backend
 

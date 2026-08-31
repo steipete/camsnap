@@ -31,6 +31,12 @@ type Device struct {
 	IsDefault bool
 }
 
+// Session keeps a camera's video stream active and can capture individual frames.
+type Session struct {
+	mu     sync.Mutex
+	handle unsafe.Pointer
+}
+
 var (
 	accessSequence atomic.Uint64
 	accessMu       sync.Mutex
@@ -101,6 +107,68 @@ func RequestAccess(ctx context.Context) (bool, error) {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	}
+}
+
+// OpenSession starts a video capture session for deviceID and waits for its
+// first frame. An empty deviceID selects the default camera.
+func OpenSession(deviceID string) (*Session, error) {
+	cDeviceID := C.CString(deviceID)
+	defer C.free(unsafe.Pointer(cDeviceID))
+
+	var cErr *C.char
+	handle := C.avf_open_session(cDeviceID, &cErr)
+	if handle == nil {
+		return nil, bridgeError(cErr, "open capture session")
+	}
+	return &Session{handle: handle}, nil
+}
+
+// Close stops the video capture session and releases its camera resources.
+func (s *Session) Close() error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.handle == nil {
+		return nil
+	}
+
+	handle := s.handle
+	s.handle = nil
+	var cErr *C.char
+	if C.avf_close_session(handle, &cErr) == 0 {
+		return bridgeError(cErr, "close capture session")
+	}
+	return nil
+}
+
+// CaptureFrame writes one JPEG from the already-running capture session.
+// A zero warmup captures the next available frame without restarting the stream.
+func (s *Session) CaptureFrame(warmup time.Duration, outPath string) error {
+	if outPath == "" {
+		return errors.New("avf: output path is required")
+	}
+	if warmup < 0 {
+		return errors.New("avf: warmup must not be negative")
+	}
+	if s == nil {
+		return errors.New("avf: capture session is closed")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.handle == nil {
+		return errors.New("avf: capture session is closed")
+	}
+
+	cOutPath := C.CString(outPath)
+	defer C.free(unsafe.Pointer(cOutPath))
+
+	var cErr *C.char
+	if C.avf_capture_session_frame(s.handle, C.double(warmup.Seconds()), cOutPath, &cErr) == 0 {
+		return bridgeError(cErr, "capture session frame")
+	}
+	return nil
 }
 
 // CaptureFrame starts a capture session for deviceID and writes one JPEG frame

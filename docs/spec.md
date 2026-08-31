@@ -31,13 +31,13 @@
 
 ### Architecture
 - **CLI**: `spf13/cobra` wired in `cmd/camsnap/main.go`; subcommands live in `internal/cli`.
-- **Config**: `internal/config` handles load/save to XDG config dir. YAML via `gopkg.in/yaml.v3`.
+- **Config**: `internal/config` handles load/save to XDG config dir. YAML via `go.yaml.in/yaml/v3`.
 - **RTSP helpers**: `internal/rtsp/url.go` builds safe RTSP URLs with auth and ports.
 - **Media execution**: `internal/exec/ffmpeg.go` wraps `ffmpeg` calls with timeouts.
 - **Motion (future)**: `internal/motion` placeholder; will plug in frame diff or gocv later.
 
 ### Tooling
-- Go 1.26; `gofmt`/`goimports`.
+- Go 1.27; `gofmt`/`goimports`.
 - `golangci-lint` with a focused rule set (vet, staticcheck, errcheck, gofmt, goimports).
 - `go test ./...`.
 - Makefile shortcuts: `fmt`, `lint`, `test`, `all`.

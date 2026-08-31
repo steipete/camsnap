@@ -52,22 +52,17 @@ func newDiscoverCmd() *cobra.Command {
 	return cmd
 }
 
-// hostOnly strips the port from a "host:port" pair (net.SplitHostPort is
-// bracket-aware, so IPv6 literals like "[fe80::1]:80" split correctly).
-// discovered devices report their ONVIF/SOAP service port, not the RTSP
-// port -- `add` defaults --port to 554 (RTSP's default) when omitted, so
-// dropping the discovered port here is deliberate, not an oversight.
+// The discovery port serves ONVIF, not RTSP; add supplies its own RTSP default.
 func hostOnly(hostPort string) string {
 	if h, _, err := net.SplitHostPort(hostPort); err == nil {
 		return h
 	}
+	if strings.HasPrefix(hostPort, "[") && strings.HasSuffix(hostPort, "]") {
+		return hostPort[1 : len(hostPort)-1]
+	}
 	return hostPort
 }
 
-// safeName turns a bare host (already run through hostOnly) into a short,
-// config-key-safe suffix for the suggested --name. IPv6 literals keep
-// internal colons after bracket-stripping (e.g. "fe80::1"); those are not
-// safe in a bare camera name, so every ':' becomes '-'.
 func safeName(host string) string {
 	return strings.ReplaceAll(host, ":", "-")
 }

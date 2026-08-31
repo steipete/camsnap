@@ -1,6 +1,15 @@
 # Changelog
 
-## 0.4.1 - Unreleased
+## 0.4.2 - Unreleased
+- Fix ONVIF discovery suggestions using the service port as the RTSP host, and support bare and scoped IPv6 camera hosts while preserving custom RTSP paths. Thanks @twidtwid (#15).
+- Refresh Go dependencies, switch YAML v3 to its maintained module, and update the Go build baseline to 1.27 and setup-go to v7.
+- Add native single-session PTZ pan sweeps with verified frames, requested-versus-observed JSON manifests, and optional fail-fast handling.
+
+## 0.4.1 - 2026-08-24
+- Fix `ptz goto`, `move`, and `home` reporting success for movements the camera never performed.
+- Keep UVC PTZ cameras streaming during control and verify settled positions through a fresh control connection.
+- Add `--settle` and `--timeout` to the PTZ motion commands; `ptz` now requires macOS Camera permission.
+- Constrain the Objective-C bridges to darwin cgo builds and move darwin-only UVC constants into the cgo implementation, fixing Linux lint.
 
 ## 0.4.0 - 2026-08-06
 - Add pan, tilt, zoom, status, and home controls for UVC USB cameras on macOS.

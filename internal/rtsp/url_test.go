@@ -70,6 +70,22 @@ func TestBuildURLWithPath(t *testing.T) {
 	}
 }
 
+func TestBuildURLPreservesCustomPath(t *testing.T) {
+	for _, path := range []string{
+		"/cam/realmonitor?channel=1&subtype=0",
+		"/token%2Fsegment?value=a%2Bb&empty=",
+		"/stream?",
+	} {
+		t.Run(path, func(t *testing.T) {
+			got, err := BuildURL(config.Camera{Host: "::1%lo0", Port: 8554, Path: path})
+			want := "rtsp://[::1%25lo0]:8554" + path
+			if err != nil || got != want {
+				t.Fatalf("BuildURL = %q, %v; want %q", got, err, want)
+			}
+		})
+	}
+}
+
 func TestReplacePath(t *testing.T) {
 	base := "rtsp://user:pass@192.168.0.10:554/stream1"
 	want := "rtsp://user:pass@192.168.0.10:554/stream2"
@@ -104,6 +120,26 @@ func TestBuildURLBareIPv6(t *testing.T) {
 			name: "configured port",
 			cam:  config.Camera{Host: "fe80::1", Port: 8554},
 			want: "rtsp://[fe80::1]:8554/stream1",
+		},
+		{
+			name: "bracketed with configured port",
+			cam:  config.Camera{Host: "[::1]", Port: 8554},
+			want: "rtsp://[::1]:8554/stream1",
+		},
+		{
+			name: "numeric zone 25 is not an encoded delimiter",
+			cam:  config.Camera{Host: "fe80::1%25"},
+			want: "rtsp://[fe80::1%2525]:554/stream1",
+		},
+		{
+			name: "numeric zone starting with 25",
+			cam:  config.Camera{Host: "fe80::1%250", Port: 8554},
+			want: "rtsp://[fe80::1%25250]:8554/stream1",
+		},
+		{
+			name: "existing bracketed escaped scope without port",
+			cam:  config.Camera{Host: "[fe80::1%25en0]", Port: 8554},
+			want: "rtsp://[fe80::1%25en0]:8554/stream1",
 		},
 		{
 			name: "with auth",
@@ -154,6 +190,9 @@ func TestBuildURLAlreadyCompleteAuthorityUnchanged(t *testing.T) {
 		{"ipv4 with port", "192.168.1.50:8080", "rtsp://192.168.1.50:8080/stream1"},
 		{"bracketed ipv6 with port", "[fe80::1]:8080", "rtsp://[fe80::1]:8080/stream1"},
 		{"bracketed zone-qualified ipv6 with port", "[fe80::1%en0]:8080", "rtsp://[fe80::1%25en0]:8080/stream1"},
+		{"existing escaped ipv6 scope with port", "[fe80::1%25en0]:8080", "rtsp://[fe80::1%25en0]:8080/stream1"},
+		{"existing escaped numeric scope with port", "[fe80::1%2525]:8080", "rtsp://[fe80::1%2525]:8080/stream1"},
+		{"raw numeric scope 25 with port", "[fe80::1%25]:8080", "rtsp://[fe80::1%2525]:8080/stream1"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

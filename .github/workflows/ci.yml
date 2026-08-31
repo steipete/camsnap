@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -46,13 +46,15 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Install golangci-lint
-        run: |
-          if ! command -v golangci-lint >/dev/null 2>&1; then
-            brew install golangci-lint
-          fi
-
-      - name: Lint and test with cgo
+      - name: Lint with cgo
+        uses: golangci/golangci-lint-action@v9
         env:
           CGO_ENABLED: "1"
-        run: make lint test
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Test with cgo
+        env:
+          CGO_ENABLED: "1"
+        run: make test

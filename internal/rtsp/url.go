@@ -20,20 +20,19 @@ func BuildURL(cam config.Camera) (string, error) {
 		return "", fmt.Errorf("host is required")
 	}
 
-	// A bare IP literal (v4 or v6) always needs JoinHostPort -- IPv6
-	// literals contain internal colons (e.g. "fe80::1"), which the old
-	// `!strings.Contains(host, ":")` check mistook for an already-complete
-	// "host:port" (or "[host]:port") authority and left untouched,
-	// producing an unbracketed, portless RTSP authority.
-	//
-	// netip.ParseAddr distinguishes a bare literal from an authority that
-	// already carries a port (it fails on "1.2.3.4:554" and on
-	// "[fe80::1]:554" alike). Unlike net.ParseIP, it also accepts a
-	// zone-qualified IPv6 literal such as "fe80::1%en0", which
-	// hostOnly returns from a discovered "[fe80::1%en0]:80".
-	// net.JoinHostPort brackets IPv6 (including the zone) automatically;
-	// RFC 6874 percent-encoding of the zone is applied when serializing
-	// the URL, not here.
+	// Released configs can contain bracketed authorities with URI-escaped
+	// scopes. Decode those once; bare address literals always use raw scopes.
+	if strings.HasPrefix(host, "[") {
+		if parsed, err := url.Parse("rtsp://" + host); err == nil {
+			if addr, err := netip.ParseAddr(parsed.Hostname()); err == nil && addr.Zone() != "" {
+				host = parsed.Host
+			}
+		}
+	}
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = host[1 : len(host)-1]
+	}
+	// Address colons and scope IDs do not mean the host already has a port.
 	if _, err := netip.ParseAddr(host); err == nil || !strings.Contains(host, ":") {
 		port := cam.Port
 		if port == 0 {
@@ -71,17 +70,13 @@ func BuildURL(cam config.Camera) (string, error) {
 		path = "/" + path
 	}
 
-	// url.URL.Host is the decoded authority (JoinHostPort's "[fe80::1%en0]:554"
-	// form). String() applies RFC 6874 and emits "%25" for the zone delimiter,
-	// which gortsplib's base.ParseURL and net/url accept. A raw "%en0" in the
-	// concatenated string is an invalid percent-escape.
-	// Normalize an already-encoded "%25" so String() does not double-escape.
+	// Escape the authority's raw IPv6 scope, but preserve released custom-path
+	// bytes, including query separators and existing percent escapes.
 	return (&url.URL{
 		Scheme: proto,
 		User:   user,
-		Host:   strings.Replace(host, "%25", "%", 1),
-		Path:   path,
-	}).String(), nil
+		Host:   host,
+	}).String() + path, nil
 }
 
 // ReplacePath replaces the trailing path segment of an RTSP URL.
