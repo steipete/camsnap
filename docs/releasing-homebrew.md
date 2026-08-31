@@ -15,13 +15,13 @@ golangci-lint run ./...
 go test ./...
 ```
 
-## 2) Bump the version in code
-Edit `cmd/camsnap/main.go` and set `var version = "x.y.z"`.
+## 2) Prepare release metadata
+Follow [the release checklist](RELEASING.md): update `CHANGELOG.md` and mirror the version in `package.json`. Leave `main.version` as `"dev"`; GoReleaser injects the tagged version through ldflags.
 
 ## 3) Tag & push
 ```sh
-git commit -am "release: vX.Y.Z"
-git tag vX.Y.Z
+git commit -am "chore(release): camsnap X.Y.Z"
+git tag -a vX.Y.Z -m "Release X.Y.Z"
 git push origin main --tags
 ```
 
@@ -50,7 +50,7 @@ camsnap --version
 ```
 
 ## 6) Announce
-- Create GitHub Release for tag `vX.Y.Z` (link changelog).
+- GoReleaser creates `camsnap X.Y.Z` for tag `vX.Y.Z`; fill its body with that version's changelog bullets and a note to verify downloads against `checksums.txt`.
 - Optionally post in team channel with upgrade command: `brew update && brew upgrade steipete/tap/camsnap`.
 
 ## Notes
