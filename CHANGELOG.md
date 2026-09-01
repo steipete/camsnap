@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.5.1 - Unreleased
+
 ## 0.5.0 - 2026-08-31
 - Add native single-session PTZ pan sweeps with verified frames, requested-versus-observed JSON manifests, and optional fail-fast handling.
 - Fix ONVIF discovery suggestions using the service port as the RTSP host, and support bare and scoped IPv6 camera hosts while preserving custom RTSP paths. Thanks @twidtwid (#15).
