@@ -2,6 +2,8 @@ module github.com/steipete/camsnap
 
 go 1.27.0
 
+toolchain go1.27.1
+
 require (
 	github.com/bluenviron/gortsplib/v5 v5.6.4
 	github.com/bluenviron/mediacommon/v2 v2.9.3
