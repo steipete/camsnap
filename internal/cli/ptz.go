@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"text/tabwriter"
@@ -452,6 +453,9 @@ func resolveNativePTZDevice(selector string) (localDevice, error) {
 		path, err := linuxDeviceSelector(selector)
 		if err != nil {
 			return localDevice{}, err
+		}
+		if resolved, resolveErr := filepath.EvalSymlinks(path); resolveErr == nil {
+			path = resolved
 		}
 		for _, d := range devices {
 			if d.ID == path {
