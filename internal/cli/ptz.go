@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -440,6 +441,26 @@ func openPTZ(ctx context.Context, selector string) (localDevice, io.Closer, ptzC
 }
 
 func resolveNativePTZDevice(selector string) (localDevice, error) {
+	if runtime.GOOS == "linux" {
+		devices, err := linuxLocalDevices()
+		if err != nil {
+			return localDevice{}, err
+		}
+		if selector == "" && len(devices) > 0 {
+			return devices[0], nil
+		}
+		path, err := linuxDeviceSelector(selector)
+		if err != nil {
+			return localDevice{}, err
+		}
+		for _, d := range devices {
+			if d.ID == path {
+				return d, nil
+			}
+		}
+		return localDevice{}, fmt.Errorf("V4L2 capture camera %q not found", selector)
+	}
+
 	devices, err := nativeEnumerateLocalDevices()
 	if err != nil {
 		return localDevice{}, fmt.Errorf("enumerate native cameras: %w", err)

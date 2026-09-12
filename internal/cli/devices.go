@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -109,15 +108,7 @@ func enumerateLocalDevices(goos string) ([]localDevice, error) {
 		}
 		return parseAVFoundationDevices(string(output)), nil
 	case "linux":
-		paths, err := filepath.Glob("/dev/video*")
-		if err != nil {
-			return nil, fmt.Errorf("list v4l2 devices: %w", err)
-		}
-		devices := make([]localDevice, 0, len(paths))
-		for _, path := range paths {
-			devices = append(devices, localDevice{Index: strings.TrimPrefix(path, "/dev/video"), Name: path})
-		}
-		return devices, nil
+		return linuxLocalDevices()
 	default:
 		return nil, fmt.Errorf("local webcams are unsupported on %s", goos)
 	}

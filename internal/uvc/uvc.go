@@ -27,7 +27,7 @@ const (
 )
 
 // ErrUnsupported reports that PTZ control is unavailable in this build.
-var ErrUnsupported = errors.New("uvc: PTZ control requires a cgo-enabled macOS build")
+var ErrUnsupported = errors.New("uvc: PTZ control requires Linux V4L2 or a cgo-enabled macOS build")
 
 // Capabilities lists the motion controls a camera advertises.
 type Capabilities struct {
