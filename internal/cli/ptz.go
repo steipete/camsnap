@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -439,43 +437,6 @@ func openPTZ(ctx context.Context, selector string) (localDevice, io.Closer, ptzC
 		return localDevice{}, nil, nil, fmt.Errorf("camera %q does not advertise any UVC PTZ controls", device.Name)
 	}
 	return device, session, controller, nil
-}
-
-func resolveNativePTZDevice(selector string) (localDevice, error) {
-	if runtime.GOOS == "linux" {
-		devices, err := linuxLocalDevices()
-		if err != nil {
-			return localDevice{}, err
-		}
-		if selector == "" && len(devices) > 0 {
-			return devices[0], nil
-		}
-		path, err := linuxDeviceSelector(selector)
-		if err != nil {
-			return localDevice{}, err
-		}
-		if resolved, resolveErr := filepath.EvalSymlinks(path); resolveErr == nil {
-			path = resolved
-		}
-		for _, d := range devices {
-			if d.ID == path {
-				return d, nil
-			}
-		}
-		return localDevice{}, fmt.Errorf("V4L2 capture camera %q not found", selector)
-	}
-
-	devices, err := nativeEnumerateLocalDevices()
-	if err != nil {
-		return localDevice{}, fmt.Errorf("enumerate native cameras: %w", err)
-	}
-	if selector != "" {
-		return resolveNativeDevice(devices, selector)
-	}
-	if device, ok := defaultNativeDevice(devices); ok {
-		return device, nil
-	}
-	return localDevice{}, fmt.Errorf("no default native camera is available")
 }
 
 func makePTZStatusOutput(device localDevice, capabilities uvc.Capabilities, status uvc.Status) ptzStatusOutput {
