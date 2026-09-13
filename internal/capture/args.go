@@ -17,7 +17,9 @@ func InputArgs(options Options, goos string) ([]string, error) {
 	case "darwin":
 		args = []string{"-f", "avfoundation", "-framerate", strconv.Itoa(options.Framerate)}
 	case "linux":
-		args = []string{"-f", "v4l2"}
+		// Loopback relays can begin with a stale frame timestamp. Use arrival
+		// time so warmup and clip duration are measured from this capture.
+		args = []string{"-use_wallclock_as_timestamps", "1", "-f", "v4l2"}
 		if options.Framerate > 0 {
 			args = append(args, "-framerate", strconv.Itoa(options.Framerate))
 		}

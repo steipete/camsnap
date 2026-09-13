@@ -154,3 +154,28 @@ make test
 ## License
 
 [MIT](LICENSE)
+
+## Linux and Omarchy cameras
+
+Install FFmpeg for capture. `camsnap devices --json` lists accessible V4L2 video
+capture nodes with their card names, device paths and numeric node indices; ISP
+subdevices and metadata/output nodes are excluded. For example:
+
+```sh
+camsnap snap --device 50 --out camera.jpg
+camsnap snap --device "Hardware ISP Camera" --out camera.jpg
+camsnap clip --device /dev/video50 --duration 2s --out camera.mp4
+camsnap ptz status --device /dev/video50
+```
+
+A device path (including `/dev/v4l/by-id/...`) is preferable for saved camera
+configuration. Numeric selectors refer to the kernel video node number, not the
+position in the list. Omitting the camera for `snap` uses the first accessible
+capture device on Linux. Name selection rejects ambiguous matches.
+
+PTZ uses standard writable V4L2 absolute pan, tilt and zoom controls; no separate
+USB access or cgo is required. Cameras without these controls report that PTZ is
+unsupported. Camera access follows the active user's device ACLs; inspect them
+with `getfacl /dev/videoN` if capture is denied. Intel IPU cameras may be exposed
+through a system-managed V4L2 relay: the relay and its camera HAL dependencies
+must work before Camsnap can receive frames.

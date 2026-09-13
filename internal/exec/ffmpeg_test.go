@@ -14,6 +14,7 @@ func TestClassifyError(t *testing.T) {
 		{"401 Unauthorized", "auth"},
 		{"Server returned 401 unauthorized", "auth"},
 		{"Operation not permitted", "permission"},
+		{"/dev/video0: Permission denied", "permission"},
 		{"Failed to create AVCaptureDeviceInput", "permission"},
 		{"Not Authorized To Capture Video", "permission"},
 		{"Connection refused", "network-refused"},
