@@ -48,6 +48,8 @@ camsnap clip living-room --path Bfy47SNWz9n2WRrw --dur 5s \
 
 Increase `--timeout` when a stream needs longer to deliver its first keyframe.
 
+With `--rtsp-client gortsplib`, snapshots use the first H.264 keyframe and the camera's session or in-stream codec parameters. Other video codecs require the ffmpeg client.
+
 ## Diagnose a camera
 
 `doctor` checks whether ffmpeg is available, tests each saved camera's network endpoint, and can run a short ffmpeg probe:

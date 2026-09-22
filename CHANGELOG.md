@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.5.1 - Unreleased
+- Fix native RTSP snapshots for cameras that supply H.264 decoding parameters in the session description, and discard undecodable video before the first keyframe.
 - Emit valid motion JSON lines with escaped camera names and render action templates once per event.
 - Preserve the parent environment for motion actions, reap completed actions, and honor watch cancellation.
 - Stop ffmpeg when its log reader fails instead of leaving motion monitoring hung.
