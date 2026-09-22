@@ -13,7 +13,6 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/base"
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
-	"github.com/bluenviron/gortsplib/v5/pkg/format/rtph264"
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 	"github.com/pion/rtp"
 )
@@ -79,7 +78,8 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		return fmt.Errorf("decoder: %w", err)
 	}
 
-	var sample bytes.Buffer
+	sample := h264Sample{sps: bytes.Clone(fmtH264.SPS), pps: bytes.Clone(fmtH264.PPS)}
+	var frame []byte
 	var sampleMu sync.Mutex
 	done := make(chan struct{})
 	errCh := make(chan error, 1)
@@ -92,10 +92,6 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		}
 		nalus, err := dec.Decode(pkt)
 		if err != nil {
-			if err != rtph264.ErrMorePacketsNeeded {
-				// ignore non-fatal decode errors
-				return
-			}
 			return
 		}
 		if len(nalus) == 0 {
@@ -108,16 +104,8 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 			return
 		default:
 		}
-		for _, n := range nalus {
-			sample.Write([]byte{0x00, 0x00, 0x00, 0x01})
-			sample.Write(n)
-		}
-		if h264.IsRandomAccess(nalus) {
-			select {
-			case <-done:
-			default:
-				close(done)
-			}
+		if frame = sample.frame(nalus); frame != nil {
+			close(done)
 		}
 	})
 
@@ -135,7 +123,7 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 	select {
 	case <-done:
 		sampleMu.Lock()
-		sampleData = bytes.Clone(sample.Bytes())
+		sampleData = frame
 		sampleMu.Unlock()
 	case err := <-errCh:
 		return fmt.Errorf("rtsp client: %w", err)
@@ -157,6 +145,41 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		return fmt.Errorf("ffmpeg write frame: %w\n%s", err, string(out))
 	}
 	return nil
+}
+
+type h264Sample struct {
+	sps, pps []byte
+}
+
+func (s *h264Sample) frame(nalus [][]byte) []byte {
+	keyframe := false
+	for _, nalu := range nalus {
+		if len(nalu) == 0 {
+			continue
+		}
+		switch h264.NALUType(nalu[0] & 0x1f) {
+		case h264.NALUTypeSPS:
+			s.sps = bytes.Clone(nalu)
+		case h264.NALUTypePPS:
+			s.pps = bytes.Clone(nalu)
+		case h264.NALUTypeIDR:
+			keyframe = true
+		}
+	}
+	if !keyframe {
+		return nil
+	}
+
+	// Cameras may send codec parameters only in SDP, or update them in-band.
+	// Feed ffmpeg those parameters and the IDR, without undecodable earlier frames.
+	var sample bytes.Buffer
+	for _, nalu := range append([][]byte{s.sps, s.pps}, nalus...) {
+		if len(nalu) != 0 {
+			sample.Write([]byte{0, 0, 0, 1})
+			sample.Write(nalu)
+		}
+	}
+	return sample.Bytes()
 }
 
 func findH264(medias []*description.Media) (*description.Media, *format.H264) {
