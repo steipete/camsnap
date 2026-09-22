@@ -3,7 +3,7 @@
 ### Goals (MVP)
 - Add/list cameras with stored per‑camera credentials (Tapo “Camera Account” or equivalent local user).
 - Grab a still frame (`snap`) or short clip (`clip`) from an RTSP URL.
-- Skeleton for motion watch daemon (`watch`) that will later trigger a command on motion.
+- Motion watch command (`watch`) that detects scene changes and launches configured shell actions.
 - ONVIF WS-Discovery to find cameras and print ready-to-use `add` commands.
 
 ### Out of scope for MVP

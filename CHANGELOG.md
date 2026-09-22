@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.5.1 - Unreleased
+- Emit valid motion JSON lines with escaped camera names and render action templates once per event.
+- Preserve the parent environment for motion actions, reap completed actions, and honor watch cancellation.
+- Stop ffmpeg when its log reader fails instead of leaving motion monitoring hung.
 - Preserve fractional clip durations instead of rounding to whole seconds or producing empty subsecond recordings.
 - Use Go 1.27.1 for preferred source, CI, and container builds while retaining the Go 1.27.0 source minimum.
 
