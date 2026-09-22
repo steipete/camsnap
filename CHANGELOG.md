@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.5.2 - Unreleased
+
 ## 0.5.1 - 2026-09-22
 
 **Highlights:** Fix native RTSP snapshots, preserve fractional clip durations, and repair motion event output and action cleanup.
