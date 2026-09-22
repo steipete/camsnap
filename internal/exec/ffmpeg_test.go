@@ -2,8 +2,12 @@ package mediaexec
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestClassifyError(t *testing.T) {
@@ -26,6 +30,27 @@ func TestClassifyError(t *testing.T) {
 		if got := ClassifyError(c.err); got != c.want {
 			t.Fatalf("ClassifyError(%q) got %s want %s", c.err, got, c.want)
 		}
+	}
+}
+
+func TestStderrReadFailureStopsFFmpeg(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture requires a POSIX shell")
+	}
+	dir := t.TempDir()
+	script := "#!/bin/sh\nwhile :; do printf '" + strings.Repeat("x", 1024) + "'; done >&2\n"
+	if err := os.WriteFile(filepath.Join(dir, "ffmpeg"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_, _, err := RunFFmpegWithStderrLines(ctx, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "read ffmpeg logs") {
+		t.Fatalf("expected a log read error, got %v", err)
+	}
+	if ctx.Err() != nil {
+		t.Fatal("ffmpeg remained running after its stderr reader failed")
 	}
 }
 

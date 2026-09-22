@@ -61,6 +61,8 @@ func RunFFmpegWithStderrLines(ctx context.Context, args []string, onLine func(st
 		}
 	}
 	if err := scanner.Err(); err != nil {
+		// No reader remains to drain stderr; stop the writer before waiting.
+		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 		return strings.Join(logTail, "\n"), nil, fmt.Errorf("read ffmpeg logs: %w", err)
 	}

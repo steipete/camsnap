@@ -89,7 +89,7 @@ camsnap watch kitchen --threshold 0.2 --cooldown 5s --json \
   --action 'touch /tmp/camsnap-motion'
 ```
 
-The action receives `CAMSNAP_CAMERA`, `CAMSNAP_SCORE`, and `CAMSNAP_TIME`. Pass `--duration` to stop after a fixed interval or `--action-template` to interpolate `{camera}`, `{score}`, and `{time}` into the command.
+Actions run asynchronously with the current environment (including `PATH`) plus `CAMSNAP_CAMERA`, `CAMSNAP_SCORE`, and `CAMSNAP_TIME`. Completed action processes are reaped while monitoring continues. `--json` writes one JSON object per line, with camera names escaped for JSON. Pass `--duration` to stop after a fixed interval or `--action-template` to interpolate `{camera}`, `{score}`, and `{time}` into the command once per event.
 
 ### Discovery and diagnostics
 

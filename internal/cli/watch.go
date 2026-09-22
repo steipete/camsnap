@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	osexec "os/exec"
 	gort "runtime"
 	"strconv"
@@ -67,14 +69,7 @@ func newWatchCmd() *cobra.Command {
 			if !mediaexec.HasBinary("ffmpeg") {
 				return fmt.Errorf("ffmpeg not found in PATH")
 			}
-			if tmpl != "" {
-				action, err = applyTemplate(tmpl, cam.Name, 0, time.Now())
-				if err != nil {
-					return err
-				}
-			}
-
-			ctx := context.Background()
+			ctx := cmd.Context()
 			if runtime > 0 {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, runtime)
@@ -131,34 +126,30 @@ func motionLineHandler(ctx context.Context, cameraName string, cooldown time.Dur
 			now := time.Now()
 			if lastTrigger.IsZero() || now.Sub(lastTrigger) >= cooldown {
 				lastTrigger = now
-				if jsonOutput {
-					cmd.Printf(`{"event":"motion","camera":"%s","score":%.3f,"time":"%s"}\n`, cameraName, score, now.Format(time.RFC3339Nano))
-				} else {
-					cmd.Printf("event=motion camera=%s score=%.3f action=%q time=%s\n", cameraName, score, action, now.Format(time.RFC3339Nano))
-				}
 				act := action
 				if tmpl != "" {
-					if rendered, err := applyTemplate(tmpl, cameraName, score, now); err == nil {
-						act = rendered
-					}
+					act = applyTemplate(tmpl, cameraName, score, now)
 				}
-				runAction(ctx, act, score, now, cameraName)
+				if jsonOutput {
+					cameraJSON, _ := json.Marshal(cameraName)
+					cmd.Printf("{\"event\":\"motion\",\"camera\":%s,\"score\":%.3f,\"time\":\"%s\"}\n", cameraJSON, score, now.Format(time.RFC3339Nano))
+				} else {
+					cmd.Printf("event=motion camera=%s score=%.3f action=%q time=%s\n", cameraName, score, act, now.Format(time.RFC3339Nano))
+				}
+				if err := runAction(ctx, act, score, now, cameraName); err != nil && ctx.Err() == nil {
+					cmd.PrintErrf("start motion action: %v\n", err)
+				}
 			}
 		}
 	}
 }
 
 func parseSceneScore(line string) (float64, bool) {
-	// looks like: "[Parsed_metadata_1 ...] scene_score=0.123"
-	if !strings.Contains(line, "scene_score=") {
-		return 0, false
-	}
 	idx := strings.Index(line, "scene_score=")
 	if idx < 0 || idx+12 >= len(line) {
 		return 0, false
 	}
 	part := line[idx+12:]
-	// trim trailing text
 	for i, r := range part {
 		if r != '.' && r != '-' && (r < '0' || r > '9') {
 			part = part[:i]
@@ -172,26 +163,24 @@ func parseSceneScore(line string) (float64, bool) {
 	return val, true
 }
 
-func runAction(ctx context.Context, action string, score float64, t time.Time, camera string) {
-	// best-effort: fire and forget, with context env
+func runAction(ctx context.Context, action string, score float64, t time.Time, camera string) error {
 	cmd := osexec.CommandContext(ctx, "sh", "-c", action)
-	cmd.Env = append(cmd.Env,
+	cmd.Env = append(os.Environ(),
 		"CAMSNAP_SCORE="+fmt.Sprintf("%.3f", score),
 		"CAMSNAP_TIME="+t.Format(time.RFC3339Nano),
 		"CAMSNAP_CAMERA="+camera,
 	)
-	_ = cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
 
-func applyTemplate(tmpl, camera string, score float64, t time.Time) (string, error) {
-	repl := map[string]string{
-		"{camera}": camera,
-		"{score}":  fmt.Sprintf("%.3f", score),
-		"{time}":   t.Format(time.RFC3339Nano),
-	}
-	out := tmpl
-	for k, v := range repl {
-		out = strings.ReplaceAll(out, k, v)
-	}
-	return out, nil
+func applyTemplate(tmpl, camera string, score float64, t time.Time) string {
+	return strings.NewReplacer(
+		"{camera}", camera,
+		"{score}", fmt.Sprintf("%.3f", score),
+		"{time}", t.Format(time.RFC3339Nano),
+	).Replace(tmpl)
 }
