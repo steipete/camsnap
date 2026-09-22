@@ -50,7 +50,7 @@ func ClipArgs(options Options, duration time.Duration, outputPath, goos string) 
 		return nil, err
 	}
 	args := append([]string{"-y"}, input...)
-	args = append(args, "-t", fmt.Sprintf("%.0f", duration.Seconds()))
+	args = append(args, "-t", formatDuration(duration))
 	if options.Kind == KindLocal {
 		return append(args,
 			"-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",

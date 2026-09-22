@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.5.1 - Unreleased
+- Preserve fractional clip durations instead of rounding to whole seconds or producing empty subsecond recordings.
 - Use Go 1.27.1 for preferred source, CI, and container builds while retaining the Go 1.27.0 source minimum.
 
 ## 0.5.0 - 2026-08-31

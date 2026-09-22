@@ -78,6 +78,7 @@ camsnap clip kitchen --dur 5s --audio-codec aac --out kitchen.mp4
 ```
 
 When `--out` is omitted, `snap` and `clip` write to a temporary file and print its path.
+Clip durations accept fractional seconds, for example `--dur 250ms` or `--dur 1.5s`.
 
 ### Motion actions
 

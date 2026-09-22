@@ -74,6 +74,30 @@ func TestWatchArgs(t *testing.T) {
 	}
 }
 
+func TestClipArgsPreservesFractionalDuration(t *testing.T) {
+	for _, kind := range []Kind{KindRTSP, KindLocal} {
+		for _, duration := range []time.Duration{250 * time.Millisecond, 1500 * time.Millisecond, 5 * time.Second} {
+			args, err := ClipArgs(Options{Kind: kind}, duration, "clip.mp4", "linux")
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for i, arg := range args {
+				if arg == "-t" {
+					found = true
+					got, err := time.ParseDuration(args[i+1] + "s")
+					if err != nil || got != duration {
+						t.Errorf("kind %v: duration %v became %q seconds", kind, duration, args[i+1])
+					}
+				}
+			}
+			if !found {
+				t.Fatal("clip has no duration limit")
+			}
+		}
+	}
+}
+
 func TestProbeArgs(t *testing.T) {
 	options := Options{URL: "rtsp://camera.test/stream1", Transport: "tcp"}
 	want := []string{
