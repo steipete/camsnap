@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -167,6 +168,9 @@ func selectCaptureCameraWithDefault(cmd *cobra.Command, args []string, cameraNam
 }
 
 func findNativeDefaultCamera() (localDevice, bool, error) {
+	if runtime.GOOS == "linux" {
+		return linuxDefaultCamera()
+	}
 	if !nativeLocalBackendAvailable() {
 		return localDevice{}, false, nil
 	}

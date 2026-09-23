@@ -439,20 +439,6 @@ func openPTZ(ctx context.Context, selector string) (localDevice, io.Closer, ptzC
 	return device, session, controller, nil
 }
 
-func resolveNativePTZDevice(selector string) (localDevice, error) {
-	devices, err := nativeEnumerateLocalDevices()
-	if err != nil {
-		return localDevice{}, fmt.Errorf("enumerate native cameras: %w", err)
-	}
-	if selector != "" {
-		return resolveNativeDevice(devices, selector)
-	}
-	if device, ok := defaultNativeDevice(devices); ok {
-		return device, nil
-	}
-	return localDevice{}, fmt.Errorf("no default native camera is available")
-}
-
 func makePTZStatusOutput(device localDevice, capabilities uvc.Capabilities, status uvc.Status) ptzStatusOutput {
 	output := ptzStatusOutput{Device: device, Capabilities: capabilities}
 	if status.Pan != nil {

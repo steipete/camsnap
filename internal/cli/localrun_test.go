@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -32,6 +34,14 @@ func TestPrepareNativeSnapshotResolvesBeforePermissionPreflight(t *testing.T) {
 }
 
 func TestLocalCapturePermissionRemediation(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		err := localCaptureFailure(fmt.Errorf("exit status 1"), "Permission denied")
+		if !strings.Contains(err.Error(), "getfacl") || strings.Contains(err.Error(), "System Settings") {
+			t.Fatalf("wrong Linux remediation: %v", err)
+		}
+		return
+	}
+
 	err := localCaptureFailure(errors.New("exit status 1"), "Failed to create AVCaptureDeviceInput: Operation not permitted")
 	for _, want := range []string{"(permission)", "System Settings → Privacy & Security → Camera", "Over SSH", "tccutil reset Camera"} {
 		if !strings.Contains(err.Error(), want) {

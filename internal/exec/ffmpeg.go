@@ -107,7 +107,7 @@ func HasBinary(name string) bool {
 func ClassifyError(stderr string) string {
 	lower := strings.ToLower(stderr)
 	switch {
-	case strings.Contains(lower, "operation not permitted") ||
+	case strings.Contains(lower, "permission denied") || strings.Contains(lower, "operation not permitted") ||
 		strings.Contains(lower, "failed to create avcapturedeviceinput") ||
 		strings.Contains(lower, "not authorized to capture video"):
 		return "permission"
