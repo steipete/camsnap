@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.5.2 - Unreleased
+## 0.5.3 - Unreleased
+
+## 0.5.2 - 2026-09-23
+
+- Fix CI code signing by loading the Apple Developer ID G2 intermediate and temporary signing keychain, enabling signed and notarized macOS releases.
 
 ## 0.5.1 - 2026-09-22
 

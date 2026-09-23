@@ -156,7 +156,8 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean --config /tmp/.goreleaser.yaml
+          # Signing hooks temporarily change the shared user keychain search list.
+          args: release --clean --parallelism 1 --config /tmp/.goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MACOS_SIGN_P12_BASE64: ${{ secrets.MACOS_SIGN_P12_BASE64 }}

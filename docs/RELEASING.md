@@ -10,10 +10,11 @@ Follow these steps for each release. Title GitHub releases as `camsnap <version>
 - The binary version is injected from the git tag via GoReleaser ldflags (`main.version` stays `"dev"` in code); no code version bump is needed.
 - Update `CHANGELOG.md` with the new version section; mirror the version in `package.json`.
 - Tag the release: `git tag -a v<version> -m "Release <version>"` and push tags after commits.
-- If a tag's release run fails, fix the workflow/config on `main` and re-release the same tag with `gh workflow run release.yml -f tag=v<version>`; the workflow uses `main`'s GoReleaser config against the tag's source.
+- If a tag's release run fails, workflow/config fixes on `main` can be applied with `gh workflow run release.yml -f tag=v<version>`; the workflow uses `main`'s GoReleaser config against the tag's source. Signing scripts come from the tag, so script fixes require a new patch release containing the fix.
 - GoReleaser builds target-specific macOS, Linux, and Windows archives plus `checksums.txt`.
 - Darwin release binaries embed the camera usage-description plist and are always signed. CI uses an ad-hoc signature when Developer ID secrets are absent.
 - Developer ID signing uses `MACOS_SIGN_P12_BASE64`, `MACOS_SIGN_P12_PASSWORD`, and `MACOS_SIGN_IDENTITY`.
+- The signing hook validates Apple's Developer ID G2 intermediate by subject, issuer, and SHA-256 fingerprint before importing it, adds its temporary keychain to the user search list, and checks for the configured valid identity before signing. Cleanup restores the original search list. Release builds run serially so signing hooks cannot race over that shared list.
 - Optional App Store Connect notarization uses `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, and `APP_STORE_CONNECT_API_KEY_P8`.
 - Confirm `update-homebrew-tap` finished. It dispatches `update-formula.yml` in `steipete/homebrew-tap` with `artifact_template={formula}_{version}_{target}.tar.gz`.
 - Verify the tap formula contains matching URLs and checksums for `darwin_amd64`, `darwin_arm64`, `linux_amd64`, and `linux_arm64`.

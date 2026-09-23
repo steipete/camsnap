@@ -1,6 +1,6 @@
 {
   "name": "camsnap-scripts",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "scripts": {
     "camsnap": "go run ./cmd/camsnap",
