@@ -22,10 +22,10 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/pion/logging v0.2.4 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.17 // indirect
+	github.com/pion/rtcp v1.2.18 // indirect
 	github.com/pion/sdp/v3 v3.0.20 // indirect
 	github.com/pion/srtp/v3 v3.1.0 // indirect
-	github.com/pion/transport/v5 v5.0.1 // indirect
+	github.com/pion/transport/v5 v5.1.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	golang.org/x/net v0.59.0 // indirect
