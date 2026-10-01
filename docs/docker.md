@@ -4,6 +4,7 @@ The camsnap container includes ffmpeg and is published for `linux/amd64` and `li
 
 ```sh
 docker run --rm ghcr.io/steipete/camsnap --help
+docker run --rm ghcr.io/steipete/camsnap:0.6.0 --version
 ```
 
 Mount one volume for persistent configuration and another for output files:

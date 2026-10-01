@@ -27,6 +27,7 @@ builds:
         env:
           - CGO_ENABLED=1
           - CC=clang
+          - MACOSX_DEPLOYMENT_TARGET=14.0
           - CGO_CFLAGS=-arch arm64
           - CGO_LDFLAGS=-arch arm64
         ldflags:
@@ -36,6 +37,7 @@ builds:
         env:
           - CGO_ENABLED=1
           - CC=clang
+          - MACOSX_DEPLOYMENT_TARGET=14.0
           - CGO_CFLAGS=-arch x86_64
           - CGO_LDFLAGS=-arch x86_64
         ldflags:

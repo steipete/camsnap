@@ -284,6 +284,7 @@ jobs:
             release_tag="${{ github.ref_name }}"
           fi
           version="${release_tag#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           minor="${version%.*}"
           major="${version%%.*}"
 
@@ -321,7 +322,18 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ steps.docker-tags.outputs.version }}
           tags: ${{ steps.docker-tags.outputs.tags }}
           labels: ${{ steps.docker-tags.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify published image version
+        env:
+          EXPECTED_VERSION: ${{ steps.docker-tags.outputs.version }}
+        run: |
+          actual=$(docker run --rm "${IMAGE}:${EXPECTED_VERSION}" --version)
+          if [ "$actual" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Container version '$actual' does not match release '$EXPECTED_VERSION'"
+            exit 1
+          fi
