@@ -125,7 +125,7 @@ func TestLocalInputArgs(t *testing.T) {
 		},
 		{
 			goos: "linux",
-			want: []string{"-f", "v4l2", "-framerate", "24", "-video_size", "1280x720", "-i", "2"},
+			want: []string{"-use_wallclock_as_timestamps", "1", "-f", "v4l2", "-framerate", "24", "-video_size", "1280x720", "-i", "2"},
 		},
 	}
 	for _, tt := range tests {
@@ -161,7 +161,7 @@ func TestLocalCommandArgs(t *testing.T) {
 		t.Fatalf("ClipArgs: %v", err)
 	}
 	wantClip := []string{
-		"-y", "-f", "v4l2", "-framerate", "30", "-video_size", "1920x1080", "-i", "0", "-t", "5",
+		"-y", "-use_wallclock_as_timestamps", "1", "-f", "v4l2", "-framerate", "30", "-video_size", "1920x1080", "-i", "0", "-t", "5",
 		"-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", "-movflags", "+faststart", "-an", "clip.mp4",
 	}
 	if !reflect.DeepEqual(clip, wantClip) {

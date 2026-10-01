@@ -68,11 +68,17 @@ func (f *fakePTZController) Status() (uvc.Status, error) {
 
 func (f *fakePTZController) SetPanTilt(pan, tilt int32) (int32, int32, error) {
 	f.record("set-pan-tilt")
-	f.setPan = f.status.Pan.Range.Clamp(pan)
-	f.setTilt = f.status.Tilt.Range.Clamp(tilt)
-	if !f.ignoreWrites {
-		f.status.Pan.Cur = f.setPan
-		f.status.Tilt.Cur = f.setTilt
+	if f.status.Pan != nil {
+		f.setPan = f.status.Pan.Range.Clamp(pan)
+		if !f.ignoreWrites {
+			f.status.Pan.Cur = f.setPan
+		}
+	}
+	if f.status.Tilt != nil {
+		f.setTilt = f.status.Tilt.Range.Clamp(tilt)
+		if !f.ignoreWrites {
+			f.status.Tilt.Cur = f.setTilt
+		}
 	}
 	f.panTiltSets++
 	return f.setPan, f.setTilt, nil
@@ -91,6 +97,8 @@ func (f *fakePTZController) Home() (uvc.Status, error) {
 	if !f.ignoreWrites {
 		if f.status.Pan != nil {
 			f.status.Pan.Cur = f.status.Pan.Range.Def
+		}
+		if f.status.Tilt != nil {
 			f.status.Tilt.Cur = f.status.Tilt.Range.Def
 		}
 		if f.status.Zoom != nil {
@@ -376,6 +384,28 @@ func TestPTZMotionWaitsForConsecutiveStableSamples(t *testing.T) {
 	}
 }
 
+func TestPTZMotionWaitsPastRepeatedIntermediateReadings(t *testing.T) {
+	controller := newFakePTZController()
+	initial := clonePTZStatus(controller.status)
+	moving := clonePTZStatus(controller.status)
+	moving.Pan.Cur = 18000
+	settled := clonePTZStatus(controller.status)
+	settled.Pan.Cur = 45000
+	controller.statusValues = []uvc.Status{initial, moving, moving, settled, settled}
+	_, restore := stubPTZBackendWithSession(t, controller)
+	defer restore()
+
+	root := NewRootCommand("test")
+	root.SetOut(&bytes.Buffer{})
+	root.SetArgs([]string{"ptz", "goto", "--pan", "12.5", "--settle", "0s", "--timeout", "500ms"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("motion reaching its target before the deadline failed: %v", err)
+	}
+	if controller.statusCalls != 5 {
+		t.Fatalf("status calls = %d, want initial read plus four verification samples", controller.statusCalls)
+	}
+}
+
 func TestPTZMotionTimesOutWhilePositionIsStillChanging(t *testing.T) {
 	controller := newFakePTZController()
 	initial := clonePTZStatus(controller.status)
@@ -644,5 +674,48 @@ func stubPTZBackendWithSession(t *testing.T, controller ptzController, verificat
 		ptzOpenController = oldOpen
 		ptzNow = oldNow
 		ptzSleep = oldSleep
+	}
+}
+
+func TestPTZSingleAxisCamera(t *testing.T) {
+	for _, axis := range []string{"pan", "tilt"} {
+		for _, command := range []string{"goto", "move", "home"} {
+			t.Run(axis+"/"+command, func(t *testing.T) {
+				controller := newFakePTZController()
+				controller.capabilities = uvc.Capabilities{PanAbsolute: axis == "pan", TiltAbsolute: axis == "tilt"}
+				controller.status.Zoom = nil
+				missing := "tilt"
+				if axis == "pan" {
+					controller.status.Tilt = nil
+				} else {
+					controller.status.Pan = nil
+					missing = "pan"
+				}
+				restore := stubPTZBackend(t, controller)
+				defer restore()
+				args := []string{"ptz", command, "--json"}
+				if command != "home" {
+					args = append(args, "--"+axis, "5")
+				}
+				root := NewRootCommand("test")
+				var output bytes.Buffer
+				root.SetOut(&output)
+				root.SetArgs(args)
+				if err := root.Execute(); err != nil {
+					t.Fatal(err)
+				}
+				var result map[string]json.RawMessage
+				if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+					t.Fatal(err)
+				}
+				if result[axis] == nil || result[missing] != nil {
+					t.Fatalf("incorrect axes in output: %s", output.String())
+				}
+				root.SetArgs([]string{"ptz", "goto", "--" + missing, "1"})
+				if err := root.Execute(); err == nil {
+					t.Fatal("unsupported axis accepted")
+				}
+			})
+		}
 	}
 }

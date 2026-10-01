@@ -1,7 +1,11 @@
 # Changelog
 
-## 0.5.3 - Unreleased
+## 0.6.0 - Unreleased
 
+- Add Linux V4L2 capture-device discovery, selection by node index or unambiguous name, default snapshots, and stable-path PTZ selection. Thanks @steipete (#20).
+- Add Linux PTZ through standard V4L2 absolute pan, tilt, and zoom controls. Physical motion is not yet hardware-verified; please report camera models, control support, and motion results.
+- Honor the full PTZ verification timeout when a camera repeats an intermediate position before reaching its target.
+- Use arrival timestamps for Linux V4L2 capture so stale relay timestamps do not break snapshot warmup or clip duration.
 - Update the native RTSP backend's Pion RTCP and transport dependencies.
 
 ## 0.5.2 - 2026-09-23

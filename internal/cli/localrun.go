@@ -96,6 +96,13 @@ func withFFmpegFallbackDevice(request localCaptureRequest, device string) localC
 }
 
 func runLocalFFmpeg(ctx context.Context, request localCaptureRequest) error {
+	if runtime.GOOS == "linux" {
+		device, err := linuxDeviceSelector(request.options.Device)
+		if err != nil {
+			return err
+		}
+		request.options.Device = device
+	}
 	var (
 		args []string
 		err  error
@@ -150,7 +157,11 @@ func localCaptureFailure(err error, output string) error {
 		details += "\n" + modes
 	}
 	if class == "permission" {
-		details += "\n" + cameraPermissionRemediation
+		if runtime.GOOS == "linux" {
+			details += "\nCheck the device ACL with getfacl /dev/videoN and ensure your active desktop session has camera access. Run camsnap devices to find usable V4L2 capture nodes."
+		} else {
+			details += "\n" + cameraPermissionRemediation
+		}
 	}
 	return fmt.Errorf("local capture failed (%s): %w%s", class, err, details)
 }

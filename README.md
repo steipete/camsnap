@@ -125,9 +125,9 @@ camsnap ptz goto --device 0 --pan 45 --settle 3s --timeout 6s
 camsnap sweep --device 0 --from -45 --to 45 --steps 7 --out-dir panorama
 ```
 
-PTZ commands keep the selected camera streaming while reading or changing its position, so they require macOS Camera permission. Motion commands verify the observed position after `--settle` (default `2s`) and fail if it does not stabilize before `--timeout` (default `5s`).
+On macOS, PTZ commands keep the selected camera streaming while reading or changing its position, so they require macOS Camera permission. Motion commands verify the observed position after `--settle` (default `2s`) and fail if it does not stabilize before `--timeout` (default `5s`).
 
-`sweep` keeps one native capture session open across the entire arc and writes numbered JPEG frames plus `manifest.json`. The manifest records requested and observed pan/tilt for each frame; failed positions are retained and reported with a non-zero exit status. Add `--fail-fast` to stop after the first failed position, or `--json` to print the manifest.
+`sweep` is macOS-only and keeps one native capture session open across the entire arc and writes numbered JPEG frames plus `manifest.json`. The manifest records requested and observed pan/tilt for each frame; failed positions are retained and reported with a non-zero exit status. Add `--fail-fast` to stop after the first failed position, or `--json` to print the manifest.
 
 See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Camera permission behavior, UVC PTZ control and sweeps, Linux device paths, and backend selection.
 
@@ -155,3 +155,31 @@ make test
 ## License
 
 [MIT](LICENSE)
+
+## Linux and Omarchy cameras
+
+Install FFmpeg for capture. `camsnap devices --json` lists accessible V4L2 video
+capture nodes with their card names, device paths and numeric node indices; ISP
+subdevices and metadata/output nodes are excluded. For example:
+
+```sh
+camsnap snap --device 50 --out camera.jpg
+camsnap snap --device "Hardware ISP Camera" --out camera.jpg
+camsnap clip --device /dev/video50 --duration 2s --out camera.mp4
+camsnap ptz status --device /dev/video50
+```
+
+A device path (including `/dev/v4l/by-id/...`) is preferable for saved camera
+configuration. Numeric selectors refer to the kernel video node number, not the
+position in the list. Omitting the camera for `snap` uses the first accessible
+capture device on Linux. Name selection rejects ambiguous matches.
+
+PTZ uses standard writable V4L2 absolute pan, tilt and zoom controls; no separate
+USB access or cgo is required. Physical PTZ motion is not yet hardware-verified;
+please report your camera model, advertised controls, and motion results in a
+[GitHub issue](https://github.com/steipete/camsnap/issues).
+Cameras without these controls report that PTZ is
+unsupported. Camera access follows the active user's device ACLs; inspect them
+with `getfacl /dev/videoN` if capture is denied. Intel IPU cameras may be exposed
+through a system-managed V4L2 relay: the relay and its camera HAL dependencies
+must work before Camsnap can receive frames.

@@ -27,11 +27,13 @@ const (
 )
 
 // ErrUnsupported reports that PTZ control is unavailable in this build.
-var ErrUnsupported = errors.New("uvc: PTZ control requires a cgo-enabled macOS build")
+var ErrUnsupported = errors.New("uvc: PTZ control requires Linux V4L2 or a cgo-enabled macOS build")
 
 // Capabilities lists the motion controls a camera advertises.
 type Capabilities struct {
 	PanTiltAbsolute bool `json:"pan_tilt_absolute"`
+	PanAbsolute     bool `json:"pan_absolute,omitempty"`
+	TiltAbsolute    bool `json:"tilt_absolute,omitempty"`
 	PanTiltRelative bool `json:"pan_tilt_relative"`
 	ZoomAbsolute    bool `json:"zoom_absolute"`
 	ZoomRelative    bool `json:"zoom_relative"`
@@ -39,8 +41,14 @@ type Capabilities struct {
 
 // Any reports whether the camera advertises any PTZ control.
 func (c Capabilities) Any() bool {
-	return c.PanTiltAbsolute || c.PanTiltRelative || c.ZoomAbsolute || c.ZoomRelative
+	return c.SupportsPan() || c.SupportsTilt() || c.PanTiltRelative || c.ZoomAbsolute || c.ZoomRelative
 }
+
+// SupportsPan includes paired UVC controls and independent V4L2 pan controls.
+func (c Capabilities) SupportsPan() bool { return c.PanTiltAbsolute || c.PanAbsolute }
+
+// SupportsTilt includes paired UVC controls and independent V4L2 tilt controls.
+func (c Capabilities) SupportsTilt() bool { return c.PanTiltAbsolute || c.TiltAbsolute }
 
 func capabilitiesFromControls(controls uint32) Capabilities {
 	return Capabilities{

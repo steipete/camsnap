@@ -102,10 +102,12 @@ func TestSnapAdHocLocalDevice(t *testing.T) {
 	}
 	args := readRecordedArgs(t, argsPath)
 	inputFormat := "avfoundation"
+	inputDevice := "0"
 	if runtime.GOOS == "linux" {
 		inputFormat = "v4l2"
+		inputDevice = "/dev/video0"
 	}
-	assertArgsContainSequence(t, args, "-f", inputFormat, "-framerate", "24", "-video_size", "1280x720", "-i", "0")
+	assertArgsContainSequence(t, args, "-f", inputFormat, "-framerate", "24", "-video_size", "1280x720", "-i", inputDevice)
 	assertArgsContainSequence(t, args, "-t", "1.5", "-update", "1", "-q:v", "2", output)
 }
 

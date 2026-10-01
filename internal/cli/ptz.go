@@ -267,7 +267,8 @@ func runPTZMotion(cmd *cobra.Command, options *ptzOptions, motion *ptzMotionOpti
 	tiltChanged := cmd.Flags().Changed("tilt")
 	panTiltChanged := panChanged || tiltChanged
 	zoomChanged := cmd.Flags().Changed("zoom")
-	if panTiltChanged && (!capabilities.PanTiltAbsolute || status.Pan == nil || status.Tilt == nil) {
+	if (panChanged && (!capabilities.SupportsPan() || status.Pan == nil)) ||
+		(tiltChanged && (!capabilities.SupportsTilt() || status.Tilt == nil)) {
 		return fmt.Errorf("camera %q does not support absolute UVC pan/tilt control", device.Name)
 	}
 	if zoomChanged && (!capabilities.ZoomAbsolute || status.Zoom == nil) {
@@ -276,8 +277,13 @@ func runPTZMotion(cmd *cobra.Command, options *ptzOptions, motion *ptzMotionOpti
 
 	target := ptzTarget{}
 	if panTiltChanged {
-		panValue := status.Pan.Cur
-		tiltValue := status.Tilt.Cur
+		var panValue, tiltValue int32
+		if status.Pan != nil {
+			panValue = status.Pan.Cur
+		}
+		if status.Tilt != nil {
+			tiltValue = status.Tilt.Cur
+		}
 		if panChanged {
 			panValue = uvc.DegreesToArcsec(pan)
 			if relative {
@@ -295,7 +301,7 @@ func runPTZMotion(cmd *cobra.Command, options *ptzOptions, motion *ptzMotionOpti
 			return fmt.Errorf("set pan/tilt for camera %q: %w", device.Name, setErr)
 		}
 		target.pan, target.tilt = appliedPan, appliedTilt
-		target.checkPan, target.checkTilt = true, true
+		target.checkPan, target.checkTilt = status.Pan != nil, status.Tilt != nil
 	}
 
 	if zoomChanged {
@@ -343,12 +349,11 @@ func settlePTZMotion(ctx context.Context, openController func(string) (ptzContro
 			return uvc.Status{}, fmt.Errorf("read applied PTZ status for camera %q: %w", device.Name, err)
 		}
 		current := ptzReading(observed)
-		if havePrevious && current == previous {
-			if err := verifyPTZTarget(device.Name, observed, target); err != nil {
-				return observed, err
-			}
+		if havePrevious && current == previous && verifyPTZTarget(device.Name, observed, target) == nil {
 			return observed, nil
 		}
+		// Drivers can repeat an intermediate position while motion continues.
+		// A missed target is only a failure once the full timeout has elapsed.
 		previous, havePrevious = current, true
 
 		remaining := deadline.Sub(ptzNow())
@@ -439,20 +444,6 @@ func openPTZ(ctx context.Context, selector string) (localDevice, io.Closer, ptzC
 	return device, session, controller, nil
 }
 
-func resolveNativePTZDevice(selector string) (localDevice, error) {
-	devices, err := nativeEnumerateLocalDevices()
-	if err != nil {
-		return localDevice{}, fmt.Errorf("enumerate native cameras: %w", err)
-	}
-	if selector != "" {
-		return resolveNativeDevice(devices, selector)
-	}
-	if device, ok := defaultNativeDevice(devices); ok {
-		return device, nil
-	}
-	return localDevice{}, fmt.Errorf("no default native camera is available")
-}
-
 func makePTZStatusOutput(device localDevice, capabilities uvc.Capabilities, status uvc.Status) ptzStatusOutput {
 	output := ptzStatusOutput{Device: device, Capabilities: capabilities}
 	if status.Pan != nil {
@@ -491,8 +482,8 @@ func writePTZStatus(output io.Writer, jsonOutput bool, status ptzStatusOutput) e
 	}
 	writer := tabwriter.NewWriter(output, 0, 4, 2, ' ', 0)
 	_, _ = fmt.Fprintln(writer, "CONTROL\tABSOLUTE\tRELATIVE\tVALUE\tRAW\tMIN\tMAX\tRES\tDEFAULT")
-	writePTZRow(writer, "PAN", status.Capabilities.PanTiltAbsolute, status.Capabilities.PanTiltRelative, angleValue(status.Pan), angleRaw(status.Pan), angleRange(status.Pan))
-	writePTZRow(writer, "TILT", status.Capabilities.PanTiltAbsolute, status.Capabilities.PanTiltRelative, angleValue(status.Tilt), angleRaw(status.Tilt), angleRange(status.Tilt))
+	writePTZRow(writer, "PAN", status.Capabilities.SupportsPan(), status.Capabilities.PanTiltRelative, angleValue(status.Pan), angleRaw(status.Pan), angleRange(status.Pan))
+	writePTZRow(writer, "TILT", status.Capabilities.SupportsTilt(), status.Capabilities.PanTiltRelative, angleValue(status.Tilt), angleRaw(status.Tilt), angleRange(status.Tilt))
 	writePTZRow(writer, "ZOOM", status.Capabilities.ZoomAbsolute, status.Capabilities.ZoomRelative, zoomValue(status.Zoom), zoomRaw(status.Zoom), zoomRange(status.Zoom))
 	if err := writer.Flush(); err != nil {
 		return fmt.Errorf("write PTZ table: %w", err)
