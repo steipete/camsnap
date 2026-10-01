@@ -1,12 +1,20 @@
 # Changelog
 
-## 0.6.0 - Unreleased
+## 0.6.1 - Unreleased
+
+## 0.6.0 - 2026-09-30
+
+**Highlights:** Linux camera discovery, flexible device selection, and PTZ through standard V4L2 absolute controls.
 
 - Add Linux V4L2 capture-device discovery, selection by node index or unambiguous name, default snapshots, and stable-path PTZ selection. Thanks @steipete (#20).
 - Add Linux PTZ through standard V4L2 absolute pan, tilt, and zoom controls. Physical motion is not yet hardware-verified; please report camera models, control support, and motion results.
 - Honor the full PTZ verification timeout when a camera repeats an intermediate position before reaching its target.
 - Use arrival timestamps for Linux V4L2 capture so stale relay timestamps do not break snapshot warmup or clip duration.
+- Build macOS release binaries for macOS 14 and later instead of inheriting the build runner's newer OS minimum.
+- Report the release version from published Docker images instead of `dev`, and verify it during release.
 - Update the native RTSP backend's Pion RTCP and transport dependencies.
+
+Verify downloaded archives against `checksums.txt`.
 
 ## 0.5.2 - 2026-09-23
 

@@ -135,7 +135,7 @@ See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Ca
 
 | Platform | RTSP cameras | Local webcams |
 | --- | --- | --- |
-| macOS | Yes | Native snapshots; ffmpeg clips and motion |
+| macOS 14+ | Yes | Native snapshots; ffmpeg clips and motion |
 | Linux | Yes | v4l2 through ffmpeg |
 | Windows | Yes | No |
 | Docker | Yes | No direct device capture |

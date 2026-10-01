@@ -12,6 +12,8 @@ Follow these steps for each release. Title GitHub releases as `camsnap <version>
 - Tag the release: `git tag -a v<version> -m "Release <version>"` and push tags after commits.
 - If a tag's release run fails, workflow/config fixes on `main` can be applied with `gh workflow run release.yml -f tag=v<version>`; the workflow uses `main`'s GoReleaser config against the tag's source. Signing scripts come from the tag, so script fixes require a new patch release containing the fix.
 - GoReleaser builds target-specific macOS, Linux, and Windows archives plus `checksums.txt`.
+- Darwin builds explicitly target macOS 14.0, the minimum required by the native AVFoundation device APIs. Verify both architectures with `otool -l camsnap` (`LC_BUILD_VERSION` must show `minos 14.0`) and `codesign --verify --strict camsnap`; retain successful notarization results from the signing job.
+- Docker builds receive the release version through `VERSION`; the release workflow verifies the published image's `--version`. Local Docker builds default to `dev` unless `--build-arg VERSION=<version>` is supplied.
 - Darwin release binaries embed the camera usage-description plist and are always signed. CI uses an ad-hoc signature when Developer ID secrets are absent.
 - Developer ID signing uses `MACOS_SIGN_P12_BASE64`, `MACOS_SIGN_P12_PASSWORD`, and `MACOS_SIGN_IDENTITY`.
 - The signing hook validates Apple's Developer ID G2 intermediate by subject, issuer, and SHA-256 fingerprint before importing it, adds its temporary keychain to the user search list, and checks for the configured valid identity before signing. Cleanup restores the original search list. Release builds run serially so signing hooks cannot race over that shared list.
