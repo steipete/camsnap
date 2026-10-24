@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.6.2 - Unreleased
+## 0.6.3 - Unreleased
+
+## 0.6.2 - 2026-10-23
+
+**Highlights:** Fetch ONVIF device information with a fresh timeout and show actionable discovery failures.
 
 - `discover --info` asks for device information with a fresh timeout after discovery finishes, and prints the failure with recovery guidance instead of hiding it. Thanks @SebTardif.
 

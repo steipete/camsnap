@@ -187,6 +187,18 @@ jobs:
           version: latest
           args: release --clean --snapshot --parallelism 1 --config /tmp/.goreleaser.yaml
 
+      - name: Upload dry-run archives
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: dry-run-archives
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+          if-no-files-found: error
+          retention-days: 3
+
   update-homebrew-tap:
     if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.event_name == 'workflow_dispatch' && !inputs.dry_run) }}
     runs-on: ubuntu-latest

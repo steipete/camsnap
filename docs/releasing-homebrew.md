@@ -20,9 +20,10 @@ Follow [the release checklist](RELEASING.md): update `CHANGELOG.md` and mirror t
 
 ## 3) Tag & push
 ```sh
-git commit -am "chore(release): camsnap X.Y.Z"
-git tag -a vX.Y.Z -m "Release X.Y.Z"
-git push origin main --tags
+# First land the reviewed release preparation and pass the release dry run.
+# Sign vX.Y.Z at that verified commit with the fleet release key.
+git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=.github/release-allowed-signers verify-tag vX.Y.Z
+git push origin refs/tags/vX.Y.Z
 ```
 
 ## 4) Verify the Homebrew tap formula
@@ -41,10 +42,9 @@ If the automatic dispatch fails, rerun `update-formula.yml` with `formula=camsna
 
 ## 5) Sanity-check install from tap
 ```sh
-brew uninstall camsnap || true
-brew untap steipete/tap || true
 brew tap steipete/tap
-brew install steipete/tap/camsnap
+git -C "$(brew --repo steipete/tap)" pull --ff-only
+brew upgrade steipete/tap/camsnap # use brew install if not installed
 brew test steipete/tap/camsnap
 camsnap --version
 ```
