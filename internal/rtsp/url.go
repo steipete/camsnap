@@ -15,30 +15,9 @@ const defaultPort = 554
 
 // BuildURL returns an RTSP URL for a camera, including auth if available.
 func BuildURL(cam config.Camera) (string, error) {
-	host := cam.Host
-	if host == "" {
-		return "", fmt.Errorf("host is required")
-	}
-
-	// Released configs can contain bracketed authorities with URI-escaped
-	// scopes. Decode those once; bare address literals always use raw scopes.
-	if strings.HasPrefix(host, "[") {
-		if parsed, err := url.Parse("rtsp://" + host); err == nil {
-			if addr, err := netip.ParseAddr(parsed.Hostname()); err == nil && addr.Zone() != "" {
-				host = parsed.Host
-			}
-		}
-	}
-	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
-		host = host[1 : len(host)-1]
-	}
-	// Address colons and scope IDs do not mean the host already has a port.
-	if _, err := netip.ParseAddr(host); err == nil || !strings.Contains(host, ":") {
-		port := cam.Port
-		if port == 0 {
-			port = defaultPort
-		}
-		host = net.JoinHostPort(host, fmt.Sprintf("%d", port))
+	host, err := HostPort(cam)
+	if err != nil {
+		return "", err
 	}
 
 	var user *url.Userinfo
@@ -77,6 +56,36 @@ func BuildURL(cam config.Camera) (string, error) {
 		User:   user,
 		Host:   host,
 	}).String() + path, nil
+}
+
+// HostPort returns the authority BuildURL uses, before a zone is percent-encoded.
+func HostPort(cam config.Camera) (string, error) {
+	host := cam.Host
+	if host == "" {
+		return "", fmt.Errorf("host is required")
+	}
+
+	// Released configs can contain bracketed authorities with URI-escaped
+	// scopes. Decode those once; bare address literals always use raw scopes.
+	if strings.HasPrefix(host, "[") {
+		if parsed, err := url.Parse("rtsp://" + host); err == nil {
+			if addr, err := netip.ParseAddr(parsed.Hostname()); err == nil && addr.Zone() != "" {
+				host = parsed.Host
+			}
+		}
+	}
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = host[1 : len(host)-1]
+	}
+	// Address colons and scope IDs do not mean the host already has a port.
+	if _, err := netip.ParseAddr(host); err == nil || !strings.Contains(host, ":") {
+		port := cam.Port
+		if port == 0 {
+			port = defaultPort
+		}
+		host = net.JoinHostPort(host, fmt.Sprintf("%d", port))
+	}
+	return host, nil
 }
 
 // ReplacePath replaces the trailing path segment of an RTSP URL.
