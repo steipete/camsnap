@@ -81,7 +81,7 @@ func newSnapCmd() *cobra.Command {
 			}
 
 			if options.Client == "gortsplib" {
-				return rtspclient.GrabFrameViaGort(ctx, options.URL, options.Transport, outPath, timeout)
+				return rtspclient.GrabFrameViaGort(ctx, options.URL, options.Transport, options.RTSPAuth, outPath, timeout)
 			}
 
 			ffArgs, err := capture.SnapArgs(options, outPath, runtime.GOOS)

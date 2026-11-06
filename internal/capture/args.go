@@ -9,7 +9,11 @@ import (
 // InputArgs returns source-specific ffmpeg input arguments.
 func InputArgs(options Options, goos string) ([]string, error) {
 	if options.Kind == KindRTSP {
-		return []string{"-rtsp_transport", options.Transport, "-i", options.URL}, nil
+		args := []string{"-rtsp_transport", options.Transport}
+		if options.RTSPAuth != "" {
+			args = append(args, "-auth_type", options.RTSPAuth)
+		}
+		return append(args, "-i", options.URL), nil
 	}
 
 	var args []string

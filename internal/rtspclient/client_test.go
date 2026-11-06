@@ -3,7 +3,10 @@ package rtspclient
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"net"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,7 +80,7 @@ func TestGrabFrameViaGortBadURL(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := GrabFrameViaGort(ctx, "rtsp://127.0.0.1:0/stream1", "udp", t.TempDir()+"/out.jpg", 500*time.Millisecond)
+	err := GrabFrameViaGort(ctx, "rtsp://127.0.0.1:0/stream1", "udp", "", t.TempDir()+"/out.jpg", 500*time.Millisecond)
 	if err == nil {
 		t.Fatalf("expected error on invalid url/connection")
 	}
@@ -87,8 +90,131 @@ func TestGrabFrameViaGortInvalidTransport(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := GrabFrameViaGort(ctx, "rtsp://127.0.0.1:0/stream1", "invalid", t.TempDir()+"/out.jpg", 500*time.Millisecond)
+	err := GrabFrameViaGort(ctx, "rtsp://127.0.0.1:0/stream1", "invalid", "", t.TempDir()+"/out.jpg", 500*time.Millisecond)
 	if err == nil {
 		t.Fatalf("expected error on invalid transport")
 	}
+}
+
+func TestGrabFrameViaGortRejectsAuthMode(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err := GrabFrameViaGort(ctx, "rtsp://127.0.0.1:9/stream1", "tcp", "ntlm", t.TempDir()+"/out.jpg", time.Second)
+	if err == nil || err.Error() != `invalid RTSP auth mode "ntlm"` {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGrabFrameViaGortAuthMode(t *testing.T) {
+	tests := []struct {
+		name   string
+		mode   string
+		prefix string
+	}{
+		{name: "basic", mode: "basic", prefix: "Basic "},
+		{name: "digest", mode: "digest", prefix: "Digest "},
+		{name: "auto", mode: "", prefix: "Digest "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authCh := make(chan string, 1)
+			ln, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ln.Close()
+			go serveRTSPAuth(ln, authCh)
+
+			port := ln.Addr().(*net.TCPAddr).Port
+			url := fmt.Sprintf("rtsp://user:pass@127.0.0.1:%d/stream1", port)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			err = GrabFrameViaGort(ctx, url, "tcp", tt.mode, t.TempDir()+"/out.jpg", time.Second)
+			if err == nil {
+				t.Fatal("expected describe to stop before a frame")
+			}
+			select {
+			case got := <-authCh:
+				if !strings.HasPrefix(got, tt.prefix) {
+					t.Fatalf("Authorization = %q, want prefix %q (client error: %v)", got, tt.prefix, err)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatalf("no Authorization header for %s: %v", tt.name, err)
+			}
+		})
+	}
+}
+
+func serveRTSPAuth(ln net.Listener, authCh chan<- string) {
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		go handleRTSPAuth(conn, authCh)
+	}
+}
+
+func handleRTSPAuth(conn net.Conn, authCh chan<- string) {
+	defer conn.Close()
+	buf := make([]byte, 0, 4096)
+	tmp := make([]byte, 2048)
+	for {
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		n, err := conn.Read(tmp)
+		if n > 0 {
+			buf = append(buf, tmp[:n]...)
+		}
+		for {
+			idx := bytes.Index(buf, []byte("\r\n\r\n"))
+			if idx < 0 {
+				break
+			}
+			raw := string(buf[:idx])
+			buf = buf[idx+4:]
+			replyRTSPAuth(conn, raw, authCh)
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+func replyRTSPAuth(conn net.Conn, raw string, authCh chan<- string) {
+	lines := strings.Split(raw, "\r\n")
+	if len(lines) == 0 || lines[0] == "" {
+		return
+	}
+	method := strings.SplitN(lines[0], " ", 2)[0]
+	cseq := "1"
+	auth := ""
+	for _, line := range lines[1:] {
+		name, value, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "cseq":
+			cseq = strings.TrimSpace(value)
+		case "authorization":
+			auth = strings.TrimSpace(value)
+		}
+	}
+	var body string
+	switch {
+	case method == "OPTIONS":
+		body = "RTSP/1.0 200 OK\r\nCSeq: " + cseq + "\r\nPublic: OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN\r\n\r\n"
+	case auth == "":
+		body = "RTSP/1.0 401 Unauthorized\r\nCSeq: " + cseq + "\r\n" +
+			"WWW-Authenticate: Digest realm=\"cam\", nonce=\"nonce1\", stale=\"FALSE\"\r\n" +
+			"WWW-Authenticate: Basic realm=\"cam\"\r\n\r\n"
+	default:
+		select {
+		case authCh <- auth:
+		default:
+		}
+		body = "RTSP/1.0 404 Not Found\r\nCSeq: " + cseq + "\r\n\r\n"
+	}
+	_, _ = conn.Write([]byte(body))
 }

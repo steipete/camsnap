@@ -60,6 +60,7 @@ type Options struct {
 	Stream       string
 	Client       string
 	Path         string
+	RTSPAuth     string // "", "basic", or "digest"; empty lets the client choose
 	NoAudio      bool
 	AudioCodec   string
 	Device       string
@@ -107,6 +108,11 @@ func Resolve(cam config.Camera, overrides Overrides) (Options, error) {
 		url = rtsp.ReplacePath(url, stream)
 	}
 
+	authMode, err := rtspAuthMode(overrides.RTSPAuth)
+	if err != nil {
+		return Options{}, err
+	}
+
 	return Options{
 		Kind:       KindRTSP,
 		URL:        url,
@@ -114,9 +120,26 @@ func Resolve(cam config.Camera, overrides Overrides) (Options, error) {
 		Stream:     stream,
 		Client:     stringValue(overrides.Client, cam.RTSPClient, defaultClient),
 		Path:       path,
+		RTSPAuth:   authMode,
 		NoAudio:    boolValue(overrides.NoAudio, cam.NoAudio),
 		AudioCodec: stringValue(overrides.AudioCodec, cam.AudioCodec, defaultAudioCodec),
 	}, nil
+}
+
+// rtspAuthMode maps --rtsp-auth to the value ffmpeg and gortsplib consume.
+// Empty means automatic selection.
+func rtspAuthMode(explicit *string) (string, error) {
+	if explicit == nil {
+		return "", nil
+	}
+	switch strings.ToLower(*explicit) {
+	case "", "auto":
+		return "", nil
+	case "basic", "digest":
+		return strings.ToLower(*explicit), nil
+	default:
+		return "", fmt.Errorf("invalid --rtsp-auth (use auto|basic|digest)")
+	}
 }
 
 func resolveLocal(cam config.Camera, overrides Overrides) (Options, error) {

@@ -13,12 +13,19 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/base"
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
+	"github.com/bluenviron/gortsplib/v5/pkg/headers"
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 	"github.com/pion/rtp"
 )
 
 // GrabFrameViaGort connects with gortsplib, reads until a random-access (IDR) frame, then pipes it to ffmpeg to save a JPEG.
-func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeout time.Duration) error {
+// authMode is "", "basic", or "digest". Empty lets the server challenge choose the method.
+func GrabFrameViaGort(ctx context.Context, url, transport, authMode, outPath string, timeout time.Duration) error {
+	switch authMode {
+	case "", "basic", "digest":
+	default:
+		return fmt.Errorf("invalid RTSP auth mode %q", authMode)
+	}
 	if transport == "" {
 		transport = "udp"
 	}
@@ -33,6 +40,11 @@ func GrabFrameViaGort(ctx context.Context, url, transport, outPath string, timeo
 		Host:         u.Host,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
+	}
+	if authMode != "" {
+		cl.OnResponse = func(res *base.Response) {
+			preferRTSPAuth(res, authMode)
+		}
 	}
 
 	switch transport {
@@ -180,6 +192,36 @@ func (s *h264Sample) frame(nalus [][]byte) []byte {
 		}
 	}
 	return sample.Bytes()
+}
+
+// preferRTSPAuth keeps only the requested WWW-Authenticate challenge.
+// gortsplib otherwise prefers digest whenever the camera offers both.
+func preferRTSPAuth(res *base.Response, mode string) {
+	if res == nil || res.Header == nil || res.StatusCode != base.StatusUnauthorized {
+		return
+	}
+	offered := res.Header["WWW-Authenticate"]
+	if len(offered) == 0 {
+		return
+	}
+	kept := make(base.HeaderValue, 0, len(offered))
+	for _, value := range offered {
+		var challenge headers.Authenticate
+		if err := challenge.Unmarshal(base.HeaderValue{value}); err != nil {
+			continue
+		}
+		switch mode {
+		case "basic":
+			if challenge.Method == headers.AuthMethodBasic {
+				kept = append(kept, value)
+			}
+		case "digest":
+			if challenge.Method == headers.AuthMethodDigest {
+				kept = append(kept, value)
+			}
+		}
+	}
+	res.Header["WWW-Authenticate"] = kept
 }
 
 func findH264(medias []*description.Media) (*description.Media, *format.H264) {

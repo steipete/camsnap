@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -186,6 +187,71 @@ func TestResolveRejectsInvalidTransport(t *testing.T) {
 	transport := "http"
 	_, err := Resolve(config.Camera{Host: "192.0.2.10"}, Overrides{Transport: &transport})
 	if err == nil || err.Error() != "invalid --rtsp-transport (use tcp|udp)" {
+		t.Fatalf("Resolve error = %v", err)
+	}
+}
+
+func TestResolveRTSPAuthReachesFFmpegArgs(t *testing.T) {
+	basic := "Basic"
+	got, err := Resolve(config.Camera{Host: "192.0.2.10", Username: "user", Password: "secret"}, Overrides{RTSPAuth: &basic})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if got.RTSPAuth != "basic" {
+		t.Fatalf("RTSPAuth = %q, want basic", got.RTSPAuth)
+	}
+	args, err := InputArgs(got, "linux")
+	if err != nil {
+		t.Fatalf("InputArgs: %v", err)
+	}
+	want := []string{"-rtsp_transport", "tcp", "-auth_type", "basic", "-i", "rtsp://user:secret@192.0.2.10:554/stream1"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("InputArgs = %#v, want %#v", args, want)
+	}
+
+	digest := "digest"
+	got, err = Resolve(config.Camera{Host: "192.0.2.10"}, Overrides{RTSPAuth: &digest})
+	if err != nil {
+		t.Fatalf("Resolve digest: %v", err)
+	}
+	args, err = InputArgs(got, "linux")
+	if err != nil {
+		t.Fatalf("InputArgs digest: %v", err)
+	}
+	want = []string{"-rtsp_transport", "tcp", "-auth_type", "digest", "-i", "rtsp://192.0.2.10:554/stream1"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("InputArgs = %#v, want %#v", args, want)
+	}
+
+	got, err = Resolve(config.Camera{Host: "192.0.2.10"}, Overrides{})
+	if err != nil {
+		t.Fatalf("Resolve auto: %v", err)
+	}
+	if got.RTSPAuth != "" {
+		t.Fatalf("default RTSPAuth = %q, want empty", got.RTSPAuth)
+	}
+	args, err = InputArgs(got, "linux")
+	if err != nil {
+		t.Fatalf("InputArgs auto: %v", err)
+	}
+	for _, arg := range args {
+		if arg == "-auth_type" {
+			t.Fatalf("auto mode added auth args: %#v", args)
+		}
+	}
+
+	auto := "AUTO"
+	got, err = Resolve(config.Camera{Host: "192.0.2.10"}, Overrides{RTSPAuth: &auto})
+	if err != nil {
+		t.Fatalf("Resolve AUTO: %v", err)
+	}
+	if got.RTSPAuth != "" {
+		t.Fatalf("AUTO RTSPAuth = %q, want empty", got.RTSPAuth)
+	}
+
+	bad := "ntlm"
+	_, err = Resolve(config.Camera{Host: "192.0.2.10"}, Overrides{RTSPAuth: &bad})
+	if err == nil || err.Error() != "invalid --rtsp-auth (use auto|basic|digest)" {
 		t.Fatalf("Resolve error = %v", err)
 	}
 }
