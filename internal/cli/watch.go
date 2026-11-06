@@ -163,8 +163,16 @@ func parseSceneScore(line string) (float64, bool) {
 	return val, true
 }
 
+func actionShell(goos, action string) (string, []string) {
+	if goos == "windows" {
+		return "cmd", []string{"/c", action}
+	}
+	return "sh", []string{"-c", action}
+}
+
 func runAction(ctx context.Context, action string, score float64, t time.Time, camera string) error {
-	cmd := osexec.CommandContext(ctx, "sh", "-c", action)
+	name, args := actionShell(gort.GOOS, action)
+	cmd := osexec.CommandContext(ctx, name, args...)
 	cmd.Env = append(os.Environ(),
 		"CAMSNAP_SCORE="+fmt.Sprintf("%.3f", score),
 		"CAMSNAP_TIME="+t.Format(time.RFC3339Nano),

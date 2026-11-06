@@ -55,6 +55,21 @@ func TestMotionJSONLines(t *testing.T) {
 	}
 }
 
+func TestActionShellUsesCmdOnWindows(t *testing.T) {
+	name, args := actionShell("windows", "echo hi")
+	if name != "cmd" || len(args) != 2 || args[0] != "/c" || args[1] != "echo hi" {
+		t.Fatalf("windows shell = %s %q", name, args)
+	}
+	name, args = actionShell("linux", "echo hi")
+	if name != "sh" || len(args) != 2 || args[0] != "-c" || args[1] != "echo hi" {
+		t.Fatalf("unix shell = %s %q", name, args)
+	}
+	name, args = actionShell("darwin", "echo hi")
+	if name != "sh" || args[0] != "-c" {
+		t.Fatalf("darwin shell = %s %q", name, args)
+	}
+}
+
 func TestActionTemplateDoesNotReinterpretCameraName(t *testing.T) {
 	now := time.Now()
 	got := applyTemplate("{camera} {score} {time}", "camera-{score}-{time}", 0.321, now)
