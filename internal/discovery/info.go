@@ -36,7 +36,7 @@ func FetchDeviceInfo(ctx context.Context, xaddr, user, pass string) (DeviceInfo,
   </s:Body>
 </s:Envelope>`
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: deviceInfoClientTimeout(ctx)}
 
 	// WS-Security attempt when creds present.
 	if user != "" {
@@ -71,6 +71,17 @@ type deviceInformation struct {
 	FirmwareVersion string `xml:"FirmwareVersion"`
 	SerialNumber    string `xml:"SerialNumber"`
 	HardwareID      string `xml:"HardwareId"`
+}
+
+// deviceInfoClientTimeout follows the caller's deadline. Five seconds
+// applies only when that context has no deadline.
+func deviceInfoClientTimeout(ctx context.Context) time.Duration {
+	if deadline, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(deadline); remaining > 0 {
+			return remaining
+		}
+	}
+	return 5 * time.Second
 }
 
 func doInfoRequest(ctx context.Context, client *http.Client, url, body, authHeader string) (DeviceInfo, error) {
