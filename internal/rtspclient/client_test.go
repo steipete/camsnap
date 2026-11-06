@@ -123,7 +123,7 @@ func TestGrabFrameViaGortAuthMode(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer ln.Close()
+			defer func() { _ = ln.Close() }()
 			go serveRTSPAuth(ln, authCh)
 
 			port := ln.Addr().(*net.TCPAddr).Port
@@ -157,7 +157,7 @@ func serveRTSPAuth(ln net.Listener, authCh chan<- string) {
 }
 
 func handleRTSPAuth(conn net.Conn, authCh chan<- string) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	buf := make([]byte, 0, 4096)
 	tmp := make([]byte, 2048)
 	for {
