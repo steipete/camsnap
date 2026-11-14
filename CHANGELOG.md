@@ -2,6 +2,10 @@
 
 ## 0.6.3 - Unreleased
 
+- Honor the caller timeout for ONVIF device-information requests. Thanks @SebTardif.
+- Normalize doctor connection hosts consistently with capture URLs, including bracketed IPv6 and explicit ports. Thanks @SebTardif.
+- Update compatible Go dependencies and build with Go 1.27.4 while retaining the Go 1.27.0 source minimum.
+
 ## 0.6.2 - 2026-10-23
 
 **Highlights:** Fetch ONVIF device information with a fresh timeout and show actionable discovery failures.

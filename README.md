@@ -142,7 +142,7 @@ See [Local webcams](docs/local-webcams.md) for stable macOS device selectors, Ca
 
 ## Development
 
-Source builds require Go 1.27 or newer and `ffmpeg` on `PATH`; Go 1.27.3 is the preferred build toolchain.
+Source builds require Go 1.27 or newer and `ffmpeg` on `PATH`; Go 1.27.4 is the preferred build toolchain.
 
 macOS CI uses the Apple Silicon `xcode-27` runner, keeps a macOS 14 deployment target for both architectures, and smoke-tests Intel binaries under Rosetta. Release CI builds snapshot archives on pull requests and main pushes. Dispatch `release.yml` on main with `dry_run: true` and the current release tag to build without publishing archives, updating the Homebrew tap, or pushing container images.
 
