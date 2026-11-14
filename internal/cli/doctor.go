@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/steipete/camsnap/internal/capture"
 	mediaexec "github.com/steipete/camsnap/internal/exec"
+	"github.com/steipete/camsnap/internal/rtsp"
 )
 
 func newDoctorCmd() *cobra.Command {
@@ -109,13 +110,11 @@ func newDoctorCmd() *cobra.Command {
 					cmd.Printf("%s %s device %q visible\n", sty.OK("✔"), cam.Name, cam.Device)
 					continue
 				}
-				host := cam.Host
-				port := cam.Port
-				if port == 0 {
-					port = 554
+				addr, err := rtsp.HostPort(cam)
+				if err != nil {
+					cmd.Printf("%s %s dial failed: %v\n", sty.Err("✖"), cam.Name, err)
+					continue
 				}
-				addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
-
 				if err := dialOnce(addr, timeout); err != nil {
 					cmd.Printf("%s %s dial %s failed: %v\n", sty.Err("✖"), cam.Name, addr, err)
 					continue
