@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.6.3 - Unreleased
+## 0.6.4 - Unreleased
+
+## 0.6.3 - 2026-11-15
+
+**Highlights:** Honor discovery timeouts and fix doctor connection-host parsing.
 
 - Honor the caller timeout for ONVIF device-information requests. Thanks @SebTardif.
 - Normalize doctor connection hosts consistently with capture URLs, including bracketed IPv6 and explicit ports. Thanks @SebTardif.
